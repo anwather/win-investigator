@@ -130,3 +130,11 @@ $result = Invoke-Command @invokeParams
 ```
 
 **Key learning:** A universal connection pattern (HTTPS everywhere, SkipCA/SkipCN, no TrustedHosts) simplifies the entire project dramatically. No more branching logic for Azure vs on-prem, no TrustedHosts management, IP addresses just work.
+
+---
+
+### HTTPS/5986 Standardization Complete (2026-03-09T2253)
+
+**Outcome:** SUCCESS
+
+All connection patterns across 14+ files now use HTTPS/5986 with SkipCACheck/SkipCNCheck. Azure connectivity skill is integrated and production-ready. Standardization eliminates all branching complexity. All diagnostics now route through the same secure connection pipeline.
