@@ -63,3 +63,24 @@ Mulder created 10 diagnostic skill files with comprehensive PowerShell code patt
 
 ### Readiness for Next Phase
 All three core agents completed work successfully. Architecture is stable, diagnostics are implemented, documentation is comprehensive. Project ready for Skinner (testing) to write test scenarios and validate against real Windows Server environments.
+
+### GitHub Pages Documentation Site (2026-03-10)
+
+**What was built:**
+- Full Jekyll documentation site using `just-the-docs` theme (dark mode) in `docs/` folder
+- 7 content pages: Home (index), Getting Started, Usage Guide, Diagnostics Reference, Examples, Troubleshooting, Architecture
+- Jekyll config with search enabled, dark color scheme, back-to-top, GitHub aux links
+- Gemfile and .gitignore for local Jekyll development
+- GitHub Actions workflow (`.github/workflows/pages.yml`) for automatic deployment from `master` branch
+
+**Content strategy:**
+- Redistributed README.md content across purpose-built pages (not copy-paste — restructured for web)
+- Pulled skill details from all 10 `skills/*/SKILL.md` files for the Diagnostics Reference page
+- Used just-the-docs callout syntax (`{: .note }`, `{: .warning }`, `{: .important }`) for emphasis
+- Consistent footer on every page: "Built by the Win-Investigator team"
+
+**Key decisions:**
+- Used `remote_theme` instead of gem theme for GitHub Pages compatibility
+- Dark color scheme matches the terminal/CLI nature of the tool
+- Pages workflow triggers only on `docs/**` changes to avoid unnecessary builds
+- Diagnostics page serves as both a reference and a "what can I ask?" guide
