@@ -1,122 +1,200 @@
 # Win-Investigator
 
-**AI-driven Windows Server troubleshooting via the Copilot CLI.**
+**Ask questions about your Windows Servers in plain English. Get clear reports instantly.**
 
-Ask natural language questions about your Windows Servers and get clear, actionable diagnostic reports. No complex commands to memorize — just ask.
-
----
-
-## What It Does
-
-Win-Investigator diagnoses Windows Server issues by:
-
-1. **Listening** to your question: "What is going on with server01?"
-2. **Connecting** to the target server via PowerShell remoting
-3. **Running focused diagnostics** based on your concern (disk space, memory, services, network, etc.)
-4. **Reporting findings** in a clear, prioritized format with suggested next steps
-
-It answers questions like:
-
-- "What is going on with server01?"
-- "Why is server01 running out of disk space?"
-- "Is the SQL service running on server02?"
-- "server03 is slow — what's using the resources?"
-- "Can you reach server04?"
+No complex commands. No scripts to learn. Just ask what's wrong, and get answers.
 
 ---
 
-## Quick Start
+## 🚀 Quick Start — 5 Minutes
 
-### Prerequisites
+### What You'll Need
 
-1. **Windows PowerShell 5.1+ or PowerShell 7+** on your local machine
-2. **PowerShell remoting enabled** on target servers:
-   ```powershell
-   # On target server, run once:
-   Enable-PSRemoting -Force
-   winrm quickconfig -q
-   ```
-3. **Network access** to target servers (port 5986 for HTTPS)
-4. **Admin rights** on target servers (or sufficient permissions for diagnostics)
-5. **Copilot CLI** installed and authenticated
+- ✅ A Windows machine (with PowerShell)
+- ✅ Admin access to at least one Windows Server you want to investigate
+- ✅ Internet connection (to authenticate with GitHub)
 
-### Using Win-Investigator
+### Step 0: Install GitHub CLI
 
-In your Copilot CLI session:
+**Windows:** Open PowerShell and run:
+```powershell
+winget install GitHub.cli
+```
+
+**Or download:** https://cli.github.com/
+
+Verify it installed:
+```bash
+gh --version
+```
+
+Expected: `gh version X.X.X (YYYY-MM-DD)`
+
+### Step 1: Authenticate with GitHub
 
 ```bash
-# Ask about a server
-copilot "What is going on with server01?"
-
-# Ask about a specific concern
-copilot "server01 is running out of disk space. What can I delete?"
-
-# Ask about a specific diagnostic
-copilot "Is the SQL service running on server02?"
-
-# Use explicit credentials
-copilot "Check server03 memory with domain\admin credentials"
+gh auth login
 ```
 
-### What You Get
+Follow the prompts:
+- **What account do you want to log into?** → GitHub.com
+- **What is your preferred protocol for Git operations?** → HTTPS
+- **Authenticate Git with your GitHub credentials?** → Y
+- **How would you like to authenticate GitHub CLI?** → Login with a web browser
 
-A structured report like this:
+A browser will open. Click **Authorize GitHub CLI** and you're done.
+
+### Step 2: Install Copilot CLI Extension
+
+```bash
+gh extension install github/gh-copilot
+```
+
+Verify it's installed:
+```bash
+gh copilot --version
+```
+
+### Step 3: Clone win-investigator
+
+```bash
+gh repo clone anwather/win-investigator
+cd win-investigator
+```
+
+### Step 4: Start Your First Investigation
+
+```bash
+gh copilot
+```
+
+This opens an interactive session. You'll see a prompt — just ask:
 
 ```
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-🔍 WIN-INVESTIGATOR REPORT
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+? What would you like help with?
 
-SERVER: server01
-STATUS: 🟡 Warning
-TIMESTAMP: 2026-03-09T14:30:00Z
-
-───────────────────────────────────────────────────
-FINDINGS
-───────────────────────────────────────────────────
-
-🔴 Disk Space Critical
-  C: is 92% full (4.6 GB free of 60 GB)
-  Impact: May cause app failures, temp file errors
-  Action: Clean temp folders, archive logs, or expand volume
-
-🟡 Memory Usage High
-  78% of 16 GB in use (SQL Server using 8.2 GB)
-  Impact: Performance may degrade under load
-  Action: Monitor trends; check for memory leaks
-
-───────────────────────────────────────────────────
-SUMMARY
-───────────────────────────────────────────────────
-
-server01 is mostly healthy but disk is critically low and memory is elevated. 
-Prioritize freeing disk space, then monitor memory trends.
-
-Next steps: Clean C:\Temp and C:\Windows\Temp, then review IIS logs for archival.
+Ask anything about your Windows Servers, like:
+  - "What is going on with server01?"
+  - "Is the SQL service running on server02?"
+  - "server03 is slow — what's using the CPU?"
 ```
+
+Type your question and press Enter. The agent and skills are automatically available.
+
+---
+
+## How It Works (Simply)
+
+```
+You ask a question (plain English)
+    ↓
+Win-Investigator connects to your server (via PowerShell)
+    ↓
+Runs quick diagnostics (disk, memory, services, network)
+    ↓
+Gives you a clear report with priorities and next steps
+```
+
+---
+
+## Example Questions You Can Ask
+
+```bash
+# General health
+"What is going on with server01?"
+
+# Specific concern
+"server01 is running out of disk space. What can I delete?"
+
+# Specific service
+"Is the SQL service running on server02?"
+
+# Performance
+"server03 is slow — what's using the resources?"
+
+# Network
+"Can you reach server04?"
+```
+
+---
+
+## Prerequisites Detail
+
+### Windows PowerShell 5.1+ or PowerShell 7+
+
+This comes built-in on Windows. Verify it:
+
+```powershell
+$PSVersionTable.PSVersion
+```
+
+Expected: `5.1` or higher (e.g., `7.4.0`)
+
+### PowerShell Remoting on Target Servers
+
+**One-time setup** (requires local admin on each target server):
+
+```powershell
+# RUN THIS ON EACH TARGET SERVER
+Enable-PSRemoting -Force
+winrm quickconfig -q
+```
+
+**Verify it works:**
+
+```powershell
+# Run from YOUR machine
+Test-WSMan server01 -UseSSL -Port 5986 -SkipCACheck -SkipCNCheck
+
+# Expected output:
+# wsmid           : http://schemas.dmtf.org/wbem/wsman/identity/identity.xsd
+# ProtocolVersion : http://schemas.dmtf.org/wbem/wsmanidentity/1.0.0
+```
+
+### Network Access to Target Servers
+
+- Target server must be **reachable by hostname or IP address**
+- Firewall must allow **port 5986** (HTTPS)
+- If different networks: ensure **routing and firewall rules permit the connection**
+
+### Admin Rights on Target Servers
+
+- Your user must have **local administrator** rights on the target, OR
+- You can provide **different credentials** when asking (see Usage section below)
+
+### GitHub Account
+
+You need a free GitHub account to authenticate. Sign up at https://github.com if you don't have one.
 
 ---
 
 ## Credentials
 
-### Default (Current User)
+### Default (Automatic)
 
-Win-Investigator uses your current Windows user identity by default. No passwords to enter — just works if you have network and admin access to the target server.
+Win-Investigator uses **your current Windows user** by default. No passwords to enter.
 
 ```bash
-copilot "Check server01"
-# Uses: your-domain\your-user (implicit)
+gh copilot
+? "Check server01"
+
+# Uses: your-domain\your-user (automatically)
 ```
 
-### Explicit Credentials
+### Explicit Credentials (If Needed)
 
-If you need to use different credentials:
+If you need different credentials (e.g., a dedicated admin account):
 
 ```bash
-copilot "Check server01 with domain\admin credentials"
-# Prompts: Enter password for domain\admin
+gh copilot
+? "Check server01 with domain\admin credentials"
+
+# The agent will prompt: "Enter password for domain\admin:"
+# Type your password (it won't echo) and press Enter
 # Uses: domain\admin for this check
 ```
+
+**Important:** Credentials are **never stored**. They are used only for that check and then discarded.
 
 ---
 

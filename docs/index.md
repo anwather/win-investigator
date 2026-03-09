@@ -9,24 +9,61 @@ permalink: /
 # Win-Investigator
 {: .fs-9 }
 
-AI-driven Windows Server troubleshooting via the Copilot CLI. Ask natural language questions about your Windows Servers and get clear, actionable diagnostic reports.
+**Ask questions about your Windows Servers in plain English. Get answers instantly.**
 {: .fs-6 .fw-300 }
 
-[Get Started](/win-investigator/getting-started){: .btn .btn-primary .fs-5 .mb-4 .mb-md-0 .mr-2 }
+No complex commands. No scripts to learn. Just ask what's wrong.
+{: .fs-5 .fw-400 }
+
+[Get Started in 5 Minutes](/win-investigator/getting-started){: .btn .btn-primary .fs-5 .mb-4 .mb-md-0 .mr-2 }
 [View on GitHub](https://github.com/anwather/win-investigator){: .btn .fs-5 .mb-4 .mb-md-0 }
 
 ---
 
-## What It Does
+{: .highlight }
+> ⚡ **First time using Copilot CLI?** No problem. We'll walk you through installing everything, step by step.
 
-Win-Investigator diagnoses Windows Server issues by:
+---
 
-1. **Listening** to your question — _"What is going on with server01?"_
-2. **Connecting** to the target server via PowerShell remoting
-3. **Running focused diagnostics** based on your concern (disk, memory, services, network, and more)
-4. **Reporting findings** in a clear, prioritized format with suggested next steps
+## The Simple Way vs. The Old Way
 
-No complex commands to memorize — just ask.
+### ❌ The Old Way (Manual)
+
+You: _"Why is server01 slow?"_
+
+```powershell
+$session = New-PSSession -ComputerName server01 -UseSSL
+Invoke-Command $session { Get-Process | Sort-Object -Property CPU -Descending | Select-Object -First 10 }
+Invoke-Command $session { Get-CimInstance Win32_PerfFormattedData_PerfProc_Process ... }
+Invoke-Command $session { Get-WmiObject Win32_LogicalDisk ... }
+# ... more commands ...
+```
+
+After 20 minutes: You have raw data but no insights.
+
+### ✅ The Win-Investigator Way
+
+You: _"server01 is slow — what's using the CPU?"_
+
+```bash
+gh copilot
+? "server01 is slow — what's using the CPU?"
+```
+
+Win-Investigator:
+
+```
+🔴 CPU Spike — Process Analysis
+  - explorer.exe: 45% CPU (Windows Explorer stuck scanning network)
+  - svchost.exe: 28% CPU (Windows Update indexing)
+  - sqlserver.exe: 18% CPU (normal operation)
+
+💡 Action: Kill explorer.exe and restart Windows Update service
+
+Next steps: Check Task Manager for explorer.exe handle locks
+```
+
+**Time:** 30 seconds. Actionable insights included.
 
 ---
 

@@ -92,3 +92,56 @@ All three core agents completed work successfully. Architecture is stable, diagn
 **Outcome:** SUCCESS
 
 Site is live and deployed. All 7 documentation pages are publicly accessible via GitHub Pages. Jekyll theme is configured with dark mode and search enabled. GitHub Actions workflow is triggering on updates to the `docs/` folder.
+
+---
+
+### Complete Beginner Documentation Rewrite (2026-03-10T1430)
+
+**Requested by:** Anthony Watherston  
+**Priority:** Complete rewrite for zero-knowledge audience  
+**Outcome:** SUCCESS
+
+**Files updated:**
+
+1. **README.md** — Rewritten Quick Start section with hand-holding through installation:
+   - Added "What You'll Need" checklist (Windows machine, admin access, internet, GitHub account)
+   - Step-by-step walkthrough: GitHub CLI install → Authentication → Copilot CLI extension → Clone repo → First investigation
+   - "How It Works (Simply)" section explaining the flow in plain English
+   - Credentials section clarified for beginners
+   - Kept all existing content (diagnostics table, examples, troubleshooting)
+
+2. **docs/index.md** — Updated landing page:
+   - Hero emphasizes simplicity: "Ask questions about your Windows Servers in plain English"
+   - Added "Get Started in 5 Minutes" CTA button linking to getting-started.md
+   - Added visual value prop: "Old Way" (manual commands) vs "Win-Investigator Way" (30-second diagnosis)
+
+3. **docs/getting-started.md** — Complete rewrite as KEY onboarding page:
+   - "What You'll Need" checklist upfront
+   - Step 0-5 walkthrough with EXACT commands and expected output
+   - "Verify Your Setup" section with 5 checkpoints
+   - "Your First Investigation" with example command and full sample output
+   - Comprehensive troubleshooting for first-time issues
+
+4. **docs/usage.md** — Added beginner context:
+   - "How to Talk to the Agent" — explains it's like chatting
+   - "Simple Examples (Start Here)" with 5 concrete examples
+   - "Tips for Better Questions" table with do/don't patterns
+   - "Common Beginner Questions" FAQ section (6 questions)
+   - Simplified output explanation with visual breakdown
+
+5. **docs/troubleshooting.md** — Reorganized with beginner issues first:
+   - "First Time Setup Issues" at top: gh not found, not authenticated, copilot extension not installed
+   - "Connection Issues": Test-WSMan fails, Cannot resolve hostname, Access denied, Certificate invalid
+   - "After Connection Issues" with full checklist
+   - Advanced issues kept but lower priority
+
+**Key patterns applied:**
+- Every instruction is testable with expected output shown
+- Exact commands provided as copy/paste blocks
+- "What You'll Need" checklists reduce decision fatigue
+- Beginner troubleshooting moved to top of troubleshooting.md
+- FAQ section in usage.md answers common hesitations
+- Connection pattern reminder embedded (HTTPS port 5986, -SkipCACheck -SkipCNCheck)
+- Use of just-the-docs callouts for emphasis
+
+**Tone:** Conversational, empathetic to non-technical users. Assumes zero knowledge of Copilot CLI, PowerShell remoting, or GitHub CLI.

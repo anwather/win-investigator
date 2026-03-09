@@ -2,13 +2,13 @@
 layout: default
 title: Getting Started
 nav_order: 1
-description: "Prerequisites, installation, and your first investigation with Win-Investigator"
+description: "Step-by-step setup for complete beginners. Install GitHub CLI, authenticate, clone the repo, run your first investigation."
 ---
 
 # Getting Started
 {: .no_toc }
 
-Get Win-Investigator running and diagnose your first server in minutes.
+**Complete beginner walkthrough.** We'll get you from zero to your first investigation in 5 minutes.
 {: .fs-6 .fw-300 }
 
 ## Table of contents
@@ -19,69 +19,231 @@ Get Win-Investigator running and diagnose your first server in minutes.
 
 ---
 
-## Prerequisites
+## What You'll Need
 
-### 1. PowerShell on Your Local Machine
+Before you start, make sure you have:
 
-Windows PowerShell 5.1+ or PowerShell 7+ is required on the machine where you run Copilot CLI.
+- ✅ **A Windows machine** (your local desktop or laptop)
+- ✅ **Admin access to at least one Windows Server** you want to investigate
+- ✅ **Internet connection** (to download tools and authenticate)
+- ✅ **A free GitHub account** (sign up at https://github.com if needed)
 
-### 2. PowerShell Remoting on Target Servers
+---
 
-{: .important }
-> This is a **one-time setup** per server. You need local admin or Domain Admin rights on the target.
+## Step 0: Verify PowerShell
+
+Open PowerShell on your local machine and check the version:
 
 ```powershell
-# Run this on each target Windows Server
+$PSVersionTable.PSVersion
+```
+
+Expected output: `5.1` or higher (e.g., `7.4.0`)
+
+If you see an older version, you can upgrade to PowerShell 7+ from: https://github.com/PowerShell/PowerShell/releases
+
+---
+
+## Step 1: Install GitHub CLI
+
+GitHub CLI is the tool that runs Copilot. Install it:
+
+**Windows (PowerShell):**
+
+```powershell
+winget install GitHub.cli
+```
+
+**Or download:** https://cli.github.com/
+
+**Verify the installation:**
+
+```bash
+gh --version
+```
+
+Expected output: `gh version 2.X.X (YYYY-MM-DD)`
+
+If this fails, restart PowerShell and try again.
+
+---
+
+## Step 2: Authenticate with GitHub
+
+Now authenticate with GitHub so that `gh` can access the Copilot extension:
+
+```bash
+gh auth login
+```
+
+You'll see prompts:
+
+```
+? What account do you want to log into?
+› GitHub.com
+
+? What is your preferred protocol for Git operations?
+› HTTPS
+
+? Authenticate Git with your GitHub credentials?
+› Y
+
+? How would you like to authenticate GitHub CLI?
+› Login with a web browser (recommended)
+```
+
+A browser window will open. Click **Authorize GitHub CLI** and you're done.
+
+**Back in PowerShell, you should see:**
+
+```
+✓ Authentication complete. You're ready to use GitHub CLI.
+```
+
+---
+
+## Step 3: Install the Copilot CLI Extension
+
+```bash
+gh extension install github/gh-copilot
+```
+
+**Expected output:**
+
+```
+✓ Installation complete
+```
+
+Verify it:
+
+```bash
+gh copilot --version
+```
+
+---
+
+## Step 4: Clone win-investigator
+
+```bash
+gh repo clone anwather/win-investigator
+cd win-investigator
+```
+
+This creates a folder and copies all the agent instructions and diagnostic skills.
+
+---
+
+## Step 5: Enable PowerShell Remoting on Target Servers
+
+{: .important }
+> **This is a one-time setup per target server.** You need local admin rights.
+
+On **each target Windows Server**, open PowerShell as Administrator and run:
+
+```powershell
 Enable-PSRemoting -Force
 winrm quickconfig -q
 ```
 
-Verify it's enabled:
+Expected output:
+
+```
+WinRM has been updated for remote management.
+WinRM service type changed successfully.
+WinRM service started.
+```
+
+**Verify it's enabled** (run this from YOUR machine):
 
 ```powershell
-Test-WSMan server01 -UseSSL   # Replace with your server name
+Test-WSMan server01 -UseSSL -Port 5986 -SkipCACheck -SkipCNCheck
 ```
 
-### 3. Network Access
+Replace `server01` with your actual server name or IP address.
 
-Your machine must be able to reach the target server on:
+**Expected output:**
 
-| Port | Protocol | Purpose |
-|------|----------|---------|
-| 5986 | HTTPS | WinRM (encrypted) |
+```
+wsmid           : http://schemas.dmtf.org/wbem/wsman/identity/identity.xsd
+ProtocolVersion : http://schemas.dmtf.org/wbem/wsmanidentity/1.0.0
+ProductVendor   : Microsoft Corporation
+ProductVersion  : 10.0.17763.1
+```
 
-Ensure firewalls and routing allow this traffic.
+If this fails, see the [Troubleshooting](#troubleshooting) section below.
 
-### 4. Admin Rights on Target Servers
+---
 
-Your user account (or the credentials you provide) must have **local administrator** or equivalent rights on each target server.
+## Verify Your Setup
 
-### 5. Copilot CLI Installed
+Before your first investigation, run these checks to make sure everything is ready:
+
+### ✅ Check 1: Is gh installed?
 
 ```bash
-# Install Copilot CLI (if not already installed)
-npm install -g @github/copilot-cli
-
-# Authenticate
-copilot auth login
+gh --version
 ```
+
+Should show: `gh version 2.X.X (YYYY-MM-DD)`
+
+### ✅ Check 2: Are you authenticated?
+
+```bash
+gh auth status
+```
+
+Should show: `Logged in to github.com as YOUR-USERNAME`
+
+### ✅ Check 3: Is Copilot CLI extension installed?
+
+```bash
+gh extension list | grep copilot
+```
+
+Should show: `github/gh-copilot` in the list
+
+### ✅ Check 4: Is win-investigator cloned?
+
+```bash
+cd win-investigator
+ls
+```
+
+Should show files like `README.md`, `.squad/`, `docs/`, etc.
+
+### ✅ Check 5: Can you reach your target server?
+
+From **your local machine**:
+
+```bash
+Test-WSMan server01 -UseSSL -Port 5986 -SkipCACheck -SkipCNCheck
+```
+
+Should show protocol and product info (see Step 5 above for example output).
 
 ---
 
 ## Your First Investigation
 
-Once prerequisites are in place, open your Copilot CLI and ask a question:
+Now you're ready! Open PowerShell in the win-investigator folder and start an interactive session:
 
 ```bash
-copilot "What is going on with server01?"
+cd win-investigator
+gh copilot
+```
+
+You'll see a prompt asking what you need help with. Just ask a question about your server:
+
+```
+? What would you like help with?
+> What is going on with server01?
 ```
 
 Win-Investigator will:
 
-1. Parse your question to identify **server01** and determine a **general health check**
-2. Connect to server01 using your current Windows credentials
-3. Run overview diagnostics (OS info, uptime, disk, memory, services)
-4. Return a structured report
+1. Connect to server01 using your current Windows credentials
+2. Run quick diagnostics (disk space, memory, services, etc.)
+3. Return a structured report
 
 ### Example Output
 
@@ -125,15 +287,203 @@ Next steps: Clean C:\Temp and C:\Windows\Temp directories, then review
 IIS logs for archival.
 ```
 
+```
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+🔍 WIN-INVESTIGATOR REPORT
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+SERVER: server01
+STATUS: 🟡 Warning
+TIMESTAMP: 2026-03-09T14:30:00Z
+
+───────────────────────────────────────────────────
+FINDINGS
+───────────────────────────────────────────────────
+
+🔴 Disk Space Critical
+  C: drive is 92% full (4.6 GB free of 60 GB total)
+  Impact: Apps may fail to write temp files, event logs may not record
+  Action: Delete temp files, archive old logs, or expand volume
+
+🟡 Memory Usage Elevated
+  Currently 78% (12.5 GB of 16 GB), SQL Server using 8.2 GB
+  Impact: System may slow down under load; disk paging increases
+  Action: Monitor trends; if persistent, check SQL for memory leaks
+
+🟢 Critical Services Running
+  SQL Server Agent: Running
+  IIS World Wide Web Publishing: Running
+  Windows Defender: Running
+
+───────────────────────────────────────────────────
+SUMMARY
+───────────────────────────────────────────────────
+
+server01 is mostly healthy but has two concerns: disk space is critically
+low at 92% full, and memory is elevated at 78%. Prioritize freeing disk
+space to prevent application failures, then monitor memory trends.
+
+Next steps: Clean C:\Temp and C:\Windows\Temp directories, then review
+IIS logs for archival.
+```
+
+---
+
+## Troubleshooting
+
+### `gh command not found`
+
+**Problem:** PowerShell doesn't recognize the `gh` command.
+
+**Solution:**
+
+1. Verify installation: `gh --version`
+2. If that fails, download from: https://cli.github.com/
+3. Restart PowerShell after installing
+4. Try again: `gh --version`
+
+### `Extension not installed: copilot`
+
+**Problem:** `gh extension list` doesn't show the copilot extension.
+
+**Solution:**
+
+```bash
+gh extension install github/gh-copilot
+```
+
+If you get an error, make sure you're authenticated:
+
+```bash
+gh auth status
+```
+
+If not authenticated, run: `gh auth login`
+
+### `Error: Unable to authenticate`
+
+**Problem:** `gh auth login` fails or `gh auth status` shows "not logged in".
+
+**Solution:**
+
+```bash
+gh auth logout
+gh auth login
+```
+
+Follow the prompts to authenticate with GitHub via web browser.
+
+### `Test-WSMan: Unable to connect to the remote host`
+
+**Problem:** Your machine can't reach the target server on port 5986.
+
+**Solution (on target server):**
+
+1. **Re-enable PowerShell remoting:**
+
+   ```powershell
+   Enable-PSRemoting -Force
+   winrm quickconfig -q
+   ```
+
+2. **Check the WinRM service is running:**
+
+   ```powershell
+   Get-Service WinRM
+   ```
+
+   If it shows "Stopped", start it:
+
+   ```powershell
+   Start-Service WinRM
+   ```
+
+3. **Check Windows Firewall allows port 5986:**
+
+   ```powershell
+   Get-NetFirewallRule -DisplayName "WinRM HTTPS" -ErrorAction SilentlyContinue | Select-Object DisplayName, Enabled
+   ```
+
+   If you don't see it, or it's disabled, create it:
+
+   ```powershell
+   New-NetFirewallRule -DisplayName "WinRM HTTPS" -Name "WINRM-HTTPS-In-TCP" -Profile Any -LocalPort 5986 -Protocol TCP -Action Allow -Direction Inbound
+   ```
+
+4. **Try Test-WSMan again from your machine:**
+
+   ```powershell
+   Test-WSMan server01 -UseSSL -Port 5986 -SkipCACheck -SkipCNCheck
+   ```
+
+### `Error: Access denied`
+
+**Problem:** Win-Investigator can reach the server but can't run commands.
+
+**Solution:**
+
+1. **Verify your user is admin on the target:**
+
+   ```powershell
+   net localgroup Administrators
+   ```
+
+   Your user should be listed. If not, add them (requires admin on target):
+
+   ```powershell
+   net localgroup Administrators domain\username /add
+   ```
+
+2. **Or use explicit credentials:**
+
+   When Win-Investigator asks a question, mention credentials:
+
+   ```
+   ? "Check server01 with domain\admin credentials"
+   ```
+
+   It will prompt for a password.
+
+### `Error: Cannot resolve server hostname`
+
+**Problem:** `Test-WSMan` fails with: "Cannot find the target computer name".
+
+**Solution:**
+
+1. **Verify the server name is correct:**
+
+   ```powershell
+   # Try ping
+   ping server01
+   ```
+
+2. **Try the FQDN instead of short name:**
+
+   ```powershell
+   Test-WSMan server01.contoso.com -UseSSL -Port 5986 -SkipCACheck -SkipCNCheck
+   ```
+
+3. **Try the IP address instead:**
+
+   ```powershell
+   Test-WSMan 192.168.1.10 -UseSSL -Port 5986 -SkipCACheck -SkipCNCheck
+   ```
+
+4. **Check your DNS settings:**
+
+   ```powershell
+   nslookup server01
+   ```
+
 ---
 
 ## Next Steps
 
-Now that you've run your first investigation:
+Once you've verified your setup and run your first investigation:
 
-- [Learn question patterns and credential handling →](/win-investigator/usage)
-- [See all available diagnostics →](/win-investigator/diagnostics)
-- [Browse example sessions →](/win-investigator/examples)
+- [Learn how to ask better questions →](/win-investigator/usage)
+- [See what diagnostics are available →](/win-investigator/diagnostics)
+- [Check out example sessions →](/win-investigator/examples)
 
 ---
 

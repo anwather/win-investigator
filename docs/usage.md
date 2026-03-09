@@ -2,13 +2,13 @@
 layout: default
 title: Usage Guide
 nav_order: 2
-description: "How to ask questions, handle credentials, and understand Win-Investigator output"
+description: "How to talk to Win-Investigator. Simple examples, credential handling, understanding reports."
 ---
 
 # Usage Guide
 {: .no_toc }
 
-Learn how to get the most out of Win-Investigator — from question patterns to reading reports.
+**How to ask Win-Investigator questions and read the reports.**
 {: .fs-6 .fw-300 }
 
 ## Table of contents
@@ -19,134 +19,250 @@ Learn how to get the most out of Win-Investigator — from question patterns to 
 
 ---
 
-## Asking Questions
+## How to Talk to the Agent
 
-Win-Investigator understands natural language. Just describe what you want to know and mention the server name.
-
-### Question Patterns
-
-| Pattern | Example | What Happens |
-|---------|---------|--------------|
-| **General health** | _"What is going on with server01?"_ | Runs overview + key health checks |
-| **Specific concern** | _"server01 is out of disk space"_ | Runs focused disk storage analysis |
-| **Specific service** | _"Is SQL running on server02?"_ | Checks service status and related events |
-| **Performance** | _"server03 is slow"_ | Runs CPU, memory, and process analysis |
-| **Connectivity** | _"Can you reach server04?"_ | Tests network, ping, WinRM, ports |
-| **Events** | _"Any errors on server01?"_ | Searches event logs for critical/error events |
-
-### Tips for Better Questions
+Win-Investigator is like chatting with a colleague. Just describe what you want to know.
 
 {: .note }
-> Include the **server name** and your **concern** in the question. The more specific you are, the more focused the diagnostic will be.
+> **Include the server name** and **what you're concerned about**. The more specific, the better.
+
+### Start an Interactive Session
 
 ```bash
-# Good — specific server + specific concern
-copilot "server01 is running out of disk space. What can I delete?"
-
-# Good — specific server + specific service
-copilot "Is the SQL service running on server02?"
-
-# OK — general, triggers a broad health check
-copilot "What is going on with server01?"
+cd win-investigator
+gh copilot
 ```
+
+You'll see a prompt asking what you need help with. Just type your question naturally.
 
 ---
 
-## Credential Handling
+## Simple Examples (Start Here)
 
-### Default: Current User
+### ✅ General Health Check
 
-By default, Win-Investigator uses your current Windows user identity. No passwords to enter — it just works if you have network and admin access to the target server.
+Ask this when you want a quick overview:
 
-```bash
-copilot "Check server01"
-# Uses: your-domain\your-user (implicit)
+```
+? "What is going on with server01?"
 ```
 
-### Explicit Credentials
+You'll get: OS info, uptime, disk space, memory, and a snapshot of services.
 
-If you need to use different credentials (e.g., a dedicated admin account):
+### ✅ Something Specific is Broken
 
-```bash
-copilot "Check server01 with domain\admin credentials"
-# Prompts: Enter password for domain\admin
-# Uses: domain\admin for this check
+Ask this when you know what's wrong:
+
+```
+? "server01 is running out of disk space"
 ```
 
-{: .warning }
-> Credentials are used for the current check only. They are **never stored** — they are passed as parameters and discarded after the session.
+You'll get: Detailed disk analysis, biggest folders, cleanup suggestions.
+
+### ✅ Is a Service Running?
+
+Ask about a specific service:
+
+```
+? "Is the SQL service running on server02?"
+```
+
+You'll get: Service status, startup type, recent errors, event log entries.
+
+### ✅ Server is Slow
+
+Ask about performance:
+
+```
+? "server03 is slow — what's using the CPU?"
+```
+
+You'll get: Top processes by CPU/memory, system load, baseline comparison.
+
+### ✅ Can You Reach It?
+
+Ask about network connectivity:
+
+```
+? "Can you reach server04?"
+```
+
+You'll get: Network adapter status, IP config, ping tests, open ports.
 
 ---
 
-## Understanding the Output
+## Tips for Better Questions
 
-All diagnostic reports follow a consistent structure:
+| Do This | Why | Example |
+|---------|-----|---------|
+| **Include server name** | Agent needs to know which server | ✅ "server01 is slow" |
+| **Include what's wrong** | Helps agent pick the right diagnostic | ✅ "disk is full" vs ❌ "server01" |
+| **Use plain English** | No special syntax needed | ✅ "Why is disk full?" vs ❌ "Get-Volume -Size" |
+| **Mention urgency if high** | Agent prioritizes critical issues | ✅ "server01 is down" vs "investigate server01" |
+
+---
+
+## Credentials: Default vs. Explicit
+
+### Default (Uses Your Current User)
+
+By default, Win-Investigator uses your Windows user account. If you have admin access to the target server, just ask:
+
+```
+? "Check server01"
+```
+
+No password prompt. It just works.
+
+### Explicit Credentials (Different User)
+
+If you need to use a different account (e.g., a dedicated admin):
+
+```
+? "Check server01 with domain\admin credentials"
+```
+
+Win-Investigator will prompt:
+
+```
+Enter password for domain\admin:
+```
+
+Type the password (it won't echo on screen) and press Enter.
+
+**Important:** Credentials are used only for that one check. They are **never stored or reused**.
+
+---
+
+## Understanding the Report
+
+All reports follow the same structure, so they're easy to read.
+
+### The Parts of a Report
 
 ```
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 🔍 WIN-INVESTIGATOR REPORT
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
-SERVER: [hostname or IP]
-STATUS: [🟢 Healthy | 🟡 Warning | 🔴 Critical]
-TIMESTAMP: [ISO 8601, UTC timezone]
+SERVER: server01                          ← Target server
+STATUS: 🟡 Warning                        ← Overall health
+TIMESTAMP: 2026-03-09T14:30:00Z           ← When the check ran
 
 ───────────────────────────────────────────────────
-FINDINGS (in priority order, most critical first)
+FINDINGS (most critical first)
 ───────────────────────────────────────────────────
 
-[Finding]
-  Status: [Severity indicator]
-  Details: [Specific measurements and data]
-  Impact: [What does this mean for your business?]
-  Action: [What you should do, if anything]
+🔴 Disk Space Critical                    ← Severity indicator
+  C: drive is 92% full (4.6 GB free)      ← Specific data
+  Impact: Apps may fail...                ← Why this matters
+  Action: Delete temp files...            ← What to do
+
+🟡 Memory Usage Elevated
+  Currently 78% (12.5 GB of 16 GB)
+  Impact: Performance may degrade...
+  Action: Monitor trends...
 
 ───────────────────────────────────────────────────
 SUMMARY
 ───────────────────────────────────────────────────
 
-[1-2 sentence plain English summary with next steps]
+server01 is mostly healthy but disk is critically low...  ← Plain English
+Next steps: Clean temp, then monitor memory.             ← What to do next
 ```
 
-### Key Points
+### Reading the Status Indicators
 
-- **Findings are priority-ordered** — most critical issues appear first.
-- **Each finding includes an action** — you always know what to do next.
-- **The summary is human-readable** — share it directly with teammates or managers.
-
----
-
-## Status Indicators
-
-| Indicator | Meaning | Action |
-|-----------|---------|--------|
-| 🟢 **Healthy** | System is normal, no action required | Monitor as usual |
-| 🟡 **Warning** | Trend is concerning or approaching a threshold | Monitor closely or investigate |
-| 🔴 **Critical** | Action required immediately, service may be impacted | Act now |
-
-These indicators appear at both the **report level** (overall server health) and the **finding level** (individual metrics).
+| Icon | Meaning | What to Do |
+|------|---------|-----------|
+| 🟢 Healthy | No problems, everything is normal | Monitor as usual |
+| 🟡 Warning | Concerning trend, approaching limit | Investigate or monitor closely |
+| 🔴 Critical | Problem now, action required | Act immediately |
 
 ---
 
-## Limitations
+## Common Beginner Questions
 
-Win-Investigator is a **diagnostic tool**, not an automation tool.
+### Q: Can I ask multiple questions in one session?
 
-| It can… | It cannot… |
-|---------|-----------|
-| ✅ Report what's happening on your servers | ❌ Restart services or processes |
-| ✅ Identify problems and suggest causes | ❌ Modify server configuration |
-| ✅ Recommend next steps | ❌ Add disk space or expand volumes |
-| ✅ Collect and prioritize findings | ❌ Fix application-level issues |
+**A:** Yes! After you get a response, you'll see the prompt again. Just ask another question.
+
+```
+? "Check server01"
+[gets report]
+? "Now check server02"
+[gets report for server02]
+```
+
+### Q: What if the agent doesn't understand my question?
+
+**A:** Rephrase it to be more specific. Include the server name and what you're concerned about.
+
+```
+❌ "diagnose"              ← Too vague
+✅ "server01 is slow"      ← Clear and specific
+```
+
+### Q: Can I use this on my local machine or must it be a server?
+
+**A:** Any Windows machine with PowerShell remoting enabled. Works for local workstations too.
+
+### Q: What if I don't have admin access to a server?
+
+**A:** Use explicit credentials to log in as a user who does:
+
+```
+? "Check server01 with domain\admin credentials"
+```
+
+### Q: How long do checks usually take?
+
+**A:** Most checks complete in 10-30 seconds. Some (like large disk scans) may take 1-2 minutes.
+
+### Q: Can I save the report?
+
+**A:** Copy/paste the report text into a document, email, or Slack. Reports are in plain text.
+
+---
+
+## Limitations & When to Escalate
+
+{: .note }
+> Win-Investigator is a **diagnostic tool**, not an automation tool. It reports findings and suggests actions — it does not make changes to your servers.
+
+### What Win-Investigator Can Do
+
+- ✅ Report what's happening on your servers
+- ✅ Identify problems and suggest causes
+- ✅ Recommend next steps
+- ✅ Collect findings in priority order
+
+### What It Cannot Do
+
+- ❌ Restart services (escalate to on-call admin)
+- ❌ Modify server configuration (escalate to on-call admin)
+- ❌ Add disk space or expand volumes (escalate to infrastructure)
+- ❌ Fix database issues (escalate to DBA)
+- ❌ Resolve security incidents (escalate to security team)
 
 ### When to Escalate
 
-| Escalate To | When |
-|-------------|------|
-| **On-call admin** | Service restarts, configuration changes |
-| **DBA** | Database-specific issues (SQL, replication, backups) |
-| **Security team** | Security events, unauthorized access, malware |
-| **Infrastructure** | Capacity planning, disk expansion, hardware |
+**On-call admin:**
+- Service restart needed
+- Configuration change needed
+- Immediate action required
+
+**DBA:**
+- Database-specific issues (SQL, replication, backups)
+- Performance tuning needed
+
+**Infrastructure:**
+- Disk expansion or capacity planning
+- Hardware issues (failed drives, RAM problems)
+
+**Security Team:**
+- Security events or unauthorized access
+- Potential malware
 
 ---
 

@@ -2,13 +2,13 @@
 layout: default
 title: Troubleshooting
 nav_order: 5
-description: "Common errors and fixes when using Win-Investigator"
+description: "Fixes for common setup and connection issues. Start here if something isn't working."
 ---
 
 # Troubleshooting
 {: .no_toc }
 
-Solutions for common issues you may encounter.
+**Something not working?** We've got solutions.
 {: .fs-6 .fw-300 }
 
 ## Table of contents
@@ -19,180 +19,377 @@ Solutions for common issues you may encounter.
 
 ---
 
-## Server Unreachable
+## First Time Setup Issues
 
+### `gh: command not found`
+
+**Problem:** PowerShell doesn't recognize the `gh` command.
+
+**Cause:** GitHub CLI is not installed or not in your PATH.
+
+**Solution:**
+
+1. Verify it installed:
+   ```bash
+   gh --version
+   ```
+
+2. If that fails:
+   - Download from: https://cli.github.com/
+   - Or reinstall via PowerShell:
+     ```powershell
+     winget install GitHub.cli
+     ```
+
+3. **Restart PowerShell** after installing, then try again.
+
+---
+
+### `Error: not authenticated` or `not logged in`
+
+**Problem:** `gh auth status` shows "You are not logged in to any GitHub hosts."
+
+**Cause:** You skipped the authentication step (Step 2 of Getting Started).
+
+**Solution:**
+
+```bash
+gh auth logout
+gh auth login
 ```
-❌ Error: Unable to connect to server01
+
+Follow the prompts to authenticate via web browser.
+
+---
+
+### `copilot extension not found`
+
+**Problem:** `gh extension list | grep copilot` returns nothing.
+
+**Cause:** The Copilot CLI extension is not installed.
+
+**Solution:**
+
+```bash
+gh extension install github/gh-copilot
 ```
 
-### Checklist
+Verify it worked:
 
-1. **Hostname/IP is correct** — Verify the name resolves: `nslookup server01`
-2. **Server is online** — `ping server01`
-3. **PowerShell remoting is enabled** on the target:
+```bash
+gh extension list
+# Should show: github/gh-copilot
+```
+
+---
+
+### `Error: Extension not available`
+
+**Problem:** `gh extension install github/gh-copilot` fails with: "Extension not available."
+
+**Cause:** Usually a network or authentication issue.
+
+**Solution:**
+
+1. Verify you're authenticated:
+   ```bash
+   gh auth status
+   ```
+
+2. If needed, re-authenticate:
+   ```bash
+   gh auth logout
+   gh auth login
+   ```
+
+3. Try the install again:
+   ```bash
+   gh extension install github/gh-copilot
+   ```
+
+---
+
+## Connection Issues
+
+### `Test-WSMan: Unable to connect to the remote host`
+
+**Problem:** `Test-WSMan server01 -UseSSL` fails.
+
+**Cause:** PowerShell remoting is not enabled on the target server, or firewall blocks port 5986.
+
+**Solution (on target server):**
+
+1. **Re-enable PowerShell remoting:**
+
    ```powershell
-   # Run on the target server
    Enable-PSRemoting -Force
    winrm quickconfig -q
    ```
-4. **Firewall allows WinRM HTTPS** — Port 5986 must be open
-5. **Network connectivity** exists between your machine and the server
 
-{: .note }
-> If the server responds to `ping` but not `Test-WSMan`, the issue is WinRM configuration, not network connectivity.
+2. **Start the WinRM service:**
+
+   ```powershell
+   Start-Service WinRM
+   Set-Service WinRM -StartupType Automatic
+   ```
+
+3. **Open Windows Firewall for WinRM HTTPS:**
+
+   ```powershell
+   New-NetFirewallRule -DisplayName "WinRM HTTPS" `
+     -Name "WINRM-HTTPS-In-TCP" -Profile Any -LocalPort 5986 `
+     -Protocol TCP -Action Allow -Direction Inbound -ErrorAction SilentlyContinue
+   ```
+
+4. **From your machine, test again:**
+
+   ```powershell
+   Test-WSMan server01 -UseSSL -Port 5986 -SkipCACheck -SkipCNCheck
+   ```
+
+   **Expected output:**
+   ```
+   wsmid           : http://schemas.dmtf.org/wbem/wsman/identity/identity.xsd
+   ProtocolVersion : http://schemas.dmtf.org/wbem/wsmanidentity/1.0.0
+   ```
 
 ---
 
-## Access Denied
+### `Error: Cannot resolve server hostname`
 
-```
-❌ Error: Access denied on server01
-```
+**Problem:** `Test-WSMan server01` fails with: "Cannot find the target computer name."
 
-### Checklist
+**Cause:** DNS can't resolve the server name, or the server is offline.
 
-1. **Your user is an admin** on the target server
-2. **Credentials are correct** (if using explicit mode)
-3. **User is in the Administrators group** on the target
-4. **Account is not disabled or locked out**
+**Solution:**
 
-### Fix: Use Explicit Credentials
+1. **Verify the server is online:**
+   ```powershell
+   ping server01
+   ```
 
-```bash
-copilot "Check server01 with domain\admin credentials"
-```
+2. **Check DNS can resolve it:**
+   ```powershell
+   nslookup server01
+   ```
 
-### Fix: Verify Group Membership
+3. **Try the FQDN (fully qualified domain name):**
+   ```powershell
+   Test-WSMan server01.contoso.com -UseSSL -Port 5986 -SkipCACheck -SkipCNCheck
+   ```
+
+4. **Try the IP address:**
+   ```powershell
+   Test-WSMan 192.168.1.10 -UseSSL -Port 5986 -SkipCACheck -SkipCNCheck
+   ```
+
+5. **Check your DNS settings:**
+   ```powershell
+   ipconfig /all | grep DNS
+   ```
+
+---
+
+### `Error: Access denied`
+
+**Problem:** Win-Investigator can reach the server but gets "access denied" errors.
+
+**Cause:** Your user account doesn't have admin rights on the target.
+
+**Solution 1: Verify admin rights**
+
+On **target server**, check if your user is admin:
 
 ```powershell
-# Run on the target server to check if a user is admin
 net localgroup Administrators
 ```
 
+Your user should be listed. If not, and you have local admin, add them:
+
+```powershell
+net localgroup Administrators domain\username /add
+```
+
+**Solution 2: Use explicit credentials**
+
+When Win-Investigator asks, use different credentials:
+
+```
+? "Check server01 with domain\admin credentials"
+```
+
+It will prompt for a password. Enter it and press Enter.
+
 ---
 
-## WinRM Not Responding
+### `Error: Server certificate invalid`
 
-```
-❌ Error: WinRM is not responding
-```
+**Problem:** Connection fails with: "Server certificate validation failed."
 
-### Fix: On the Target Server
+**Cause:** WinRM is using a self-signed certificate (normal) but your machine doesn't trust it.
 
-```powershell
-# Check if WinRM service is running
-Get-Service WinRM
+**Solution:**
 
-# Start it if needed
-Start-Service WinRM
-
-# Re-enable PowerShell remoting
-Enable-PSRemoting -Force
-```
-
-### Fix: Check Firewall Rules
+All Win-Investigator connections use `-SkipCACheck -SkipCNCheck`, which handles this automatically. If you see this error anyway:
 
 ```powershell
-# On the target server — check for WinRM HTTPS firewall rule
-Get-NetFirewallRule -DisplayName "WinRM HTTPS" -ErrorAction SilentlyContinue | Select-Object DisplayName, Enabled
-# Also check for built-in HTTPS rule
-Get-NetFirewallRule -Name "WINRM-HTTPS-In-TCP" -ErrorAction SilentlyContinue | Select-Object DisplayName, Enabled
-```
-
-### Fix: Certificate Handling (IP Addresses and Self-Signed Certs)
-
-When connecting to IP addresses or servers with self-signed certificates, use session options:
-
-```powershell
-# On YOUR machine — use SkipCACheck and SkipCNCheck (no TrustedHosts modification needed)
+# From your machine, test with the right flags:
 $SessionOption = New-PSSessionOption -SkipCACheck -SkipCNCheck
-New-PSSession -ComputerName "server01" -UseSSL -Port 5986 -SessionOption $SessionOption
+Test-WSMan server01 -UseSSL -Port 5986 -SessionOption $SessionOption
 ```
+
+---
+
+## After Connection Issues
+
+### `Error: Unable to connect to server01` (from Win-Investigator)
+
+**Checklist:**
+
+{: .important }
+> Verify each step in order before moving to the next:
+
+1. ✅ Server name/IP is correct: `ping server01`
+2. ✅ Server is online and reachable
+3. ✅ PowerShell remoting enabled on target: `Enable-PSRemoting -Force`
+4. ✅ WinRM service running on target: `Get-Service WinRM`
+5. ✅ Firewall allows port 5986 on target
+6. ✅ Test from your machine: `Test-WSMan server01 -UseSSL -Port 5986 -SkipCACheck -SkipCNCheck`
+7. ✅ You have admin rights on target (or use explicit credentials)
+
+If all of these pass, try your investigation again.
+
+---
+
+### `Error: WinRM is not responding`
+
+**Problem:** Win-Investigator times out or fails with WinRM errors.
+
+**Solution:**
+
+1. **On target server, restart WinRM:**
+
+   ```powershell
+   Stop-Service WinRM -Force
+   Start-Service WinRM
+   ```
+
+2. **Re-enable PowerShell remoting:**
+
+   ```powershell
+   Enable-PSRemoting -Force
+   winrm quickconfig -q
+   ```
+
+3. **From your machine, verify Test-WSMan works:**
+
+   ```powershell
+   Test-WSMan server01 -UseSSL -Port 5986 -SkipCACheck -SkipCNCheck
+   ```
+
+4. **Then try your investigation again.**
+
+---
+
+## Runtime Issues
+
+### `Error: Command timed out`
+
+**Problem:** Win-Investigator hangs or returns "timed out."
+
+**Cause:** Target server is under heavy load, or network latency is high.
+
+**Solution:**
+
+1. Check if the target server is responsive:
+   ```powershell
+   ping server01
+   ```
+
+2. Check server load (from target):
+   ```powershell
+   Get-Process | Sort-Object CPU -Descending | Select-Object -First 5
+   ```
+
+3. Try a simpler diagnostic first:
+   ```
+   ? "Check server01"  ← Lighter than specific diagnostics
+   ```
+
+4. If diagnostics consistently time out, the server may be overloaded. Escalate to on-call admin.
 
 {: .note }
-> `-SkipCACheck` and `-SkipCNCheck` handle self-signed certificates and IP address connections without requiring TrustedHosts modification.
+> Large disk scans or event log searches can take 2-5 minutes on large servers. This is expected.
 
 ---
 
-## Command Timed Out
+### `Error: Partial results`
 
-If diagnostics hang or timeout:
+**Problem:** Win-Investigator returns incomplete data.
 
-1. **Target server is under heavy load** — CPU or memory may be maxed out
-2. **Network latency is high** — Check for routing issues or congestion
-3. **Try a simpler diagnostic first** — A general health check is lighter than a deep disk analysis
-4. **Check server responsiveness** — Can you run basic commands like `ping` or `Test-WSMan`?
+**Cause:** Some checks failed due to:
+- Insufficient permissions (can't read Security event log, for example)
+- PowerShell modules not available on target
+- Older Windows Server versions with fewer cmdlets
 
-{: .note }
-> Some diagnostics (like finding large files across an entire volume) can take several minutes on large servers. This is expected.
+**Solution:**
 
----
-
-## DNS Resolution Failure
-
-```
-❌ Error: server01 cannot be resolved
-```
-
-### Fix
-
-1. Try the **IP address** instead of hostname
-2. Check your **DNS settings**: `nslookup server01`
-3. Verify DNS is working: `nslookup google.com`
-4. If using a short name, try the **FQDN**: `server01.contoso.com`
+Win-Investigator handles this gracefully. It reports what it could collect and notes what failed. This is normal and doesn't prevent useful diagnostics.
 
 ---
 
-## WinRM HTTPS Certificate Issues
+## Network / Firewall Issues
 
-```
-❌ Error: Server certificate invalid
-```
+### `Firewall blocks port 5986`
 
-This occurs when using HTTPS (port 5986) and the certificate is self-signed or expired.
-
-### Fix
-
-For testing, you can skip certificate verification:
+**On target server, verify the rule exists:**
 
 ```powershell
-$sessionOption = New-PSSessionOption -SkipCACheck -SkipCNCheck
-Enter-PSSession -ComputerName server01 -UseSSL -SessionOption $sessionOption
+Get-NetFirewallRule -DisplayName "*WinRM*" | Select-Object DisplayName, Enabled
 ```
 
-{: .warning }
-> Skipping certificate checks reduces security. Only use this for testing in trusted environments. In production, configure proper certificates.
+If you don't see an enabled rule for port 5986, create one:
+
+```powershell
+New-NetFirewallRule -DisplayName "WinRM HTTPS" `
+  -Name "WINRM-HTTPS-In-TCP" -Profile Any -LocalPort 5986 `
+  -Protocol TCP -Action Allow -Direction Inbound
+```
+
+Then test from your machine:
+
+```powershell
+Test-WSMan server01 -UseSSL -Port 5986 -SkipCACheck -SkipCNCheck
+```
 
 ---
 
-## Partial Results
+### Servers on Different Networks
 
-If Win-Investigator returns partial data or some checks fail:
+If your machine and target servers are on different networks (e.g., datacenter behind a proxy):
 
-- **Some cmdlets may not be available** on older Windows Server versions
-- **Permissions may be insufficient** for certain data (e.g., Security event log)
-- **Modules may not be installed** (e.g., ServerManager on non-Server SKUs)
-
-Win-Investigator handles these gracefully by falling back to alternative methods (e.g., WMI instead of Storage cmdlets) and reporting what it could collect.
+1. Ensure network routing permits HTTPS traffic on port 5986
+2. Verify no proxy is blocking the connection (proxies often block remoting)
+3. Try the IP address instead of hostname
+4. Contact network admin if firewalls block the connection
 
 ---
 
 ## Escalation Guide
 
-When Win-Investigator identifies issues but you need human action:
+When Win-Investigator identifies issues but can't fix them, here's who to contact:
 
-| Issue | Escalate To | What to Tell Them |
+| Issue | Escalate To | What to Share |
 |-------|-------------|-------------------|
-| Service needs restart | On-call admin | Service name, current state, crash history |
-| Disk space critical | Infrastructure | Drive letter, free space, cleanup candidates |
-| Database issues | DBA | SQL instance, error events, resource usage |
+| Service needs restart | On-call admin | Server name, service name, error events |
+| Disk critically full | Infrastructure | Drive letter, free space, largest folders |
+| Database issues | DBA | SQL instance, memory usage, error events |
 | Security events | Security team | Event IDs, timestamps, affected accounts |
-| Hardware failure | Infrastructure | SMART data, disk health status, error counts |
-| Application crash | App owner | Process name, PID, crash events, memory usage |
-| Network issues | Network admin | Adapter status, DNS config, port test results |
+| Hardware failure | Infrastructure | Disk health, SMART data, error counts |
+| Application crash | App owner | Process name, PID, error events |
+| Network issues | Network admin | Adapter status, DNS config, open ports |
 
-{: .important }
-> Always include the Win-Investigator report when escalating. It provides the specific data and timestamps that responders need.
+Always share the Win-Investigator report — it gives the specific data responders need.
 
 ---
 
