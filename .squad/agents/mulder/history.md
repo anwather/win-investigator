@@ -45,7 +45,27 @@
 
 ---
 
-## Cross-Agent Context (2026-03-10)
+### Azure VM Connectivity Skill Created
+
+**Date:** Session current  
+**What:** Created `skills/azure-connectivity/SKILL.md` and updated connectivity skill + copilot-instructions for Azure VM public IP scenarios.
+
+**Key patterns for Azure VM remoting:**
+- Detect Azure targets: public IP (not RFC1918) or `*.cloudapp.azure.com` hostnames
+- Always HTTPS (port 5986) — never HTTP over public internet
+- Always explicit credentials — no Kerberos over public IP
+- TrustedHosts must include target IP on client side
+- NSG inbound rule for TCP 5986 is required in Azure
+- `New-PSSessionOption -SkipCACheck -SkipCNCheck` for self-signed certs
+- `New-CimSessionOption -UseSsl -SkipCACheck -SkipCNCheck` for CIM sessions
+- Alternative approaches: Azure Bastion, Serial Console, Run Command
+
+**Files created/updated:**
+- `skills/azure-connectivity/SKILL.md` — New comprehensive skill (pre-flight detection, NSG checks, WinRM HTTPS setup, TrustedHosts, PSSession/CimSession over SSL, error table, alternatives)
+- `skills/connectivity/SKILL.md` — Added Azure target detection, HTTPS connection path, Azure-specific errors
+- `.github/copilot-instructions.md` — Added Azure VM credentials section, Azure-specific errors, HTTPS transport in workflow, azure-connectivity to skills reference
+
+---
 
 **Team synchronization after initial build:**
 
@@ -63,3 +83,50 @@ Doggett completed three-layer documentation with comprehensive copilot-instructi
 
 ### Readiness for Next Phase
 All three agents completed work successfully. Mulder's skills are production-ready. Project ready for Skinner (testing) to write test scenarios and validate diagnostic functions.
+
+---
+
+### HTTPS-Only Connection Pattern Enforced
+
+**Date:** Current session  
+**Directive from:** Anthony Watherston (owner)
+
+**What changed:** Swept ALL skill files, instruction files, agent definition, docs, and README to enforce a universal HTTPS-only connection pattern. Every `Invoke-Command`, `New-PSSession`, `New-CimSession`, and `Test-WSMan` call now uses:
+
+- **HTTPS on port 5986** — the ONLY transport (HTTP/5985 removed entirely)
+- **`-SkipCACheck -SkipCNCheck`** on all session options — handles self-signed certs and IP address connections
+- **No TrustedHosts modification** — `-SkipCACheck` and `-SkipCNCheck` eliminate the need
+- **IP addresses supported directly** — no DNS requirement, no TrustedHosts workaround
+
+**Files updated (14 total):**
+- `skills/connectivity/SKILL.md` — Complete rewrite. Removed Azure detection branching, HTTP path, TrustedHosts. HTTPS+SkipCA+SkipCN is the single universal pattern.
+- `skills/azure-connectivity/SKILL.md` — Removed TrustedHosts step entirely. Simplified to Azure-specific concerns (NSG rules, WinRM HTTPS listener setup, alternative access methods).
+- `skills/server-overview/SKILL.md` — All `Invoke-Command` and splatted `$invokeParams` updated with UseSSL/Port/SessionOption.
+- `skills/processes/SKILL.md` — Same treatment.
+- `skills/performance/SKILL.md` — Same treatment.
+- `skills/disk-storage/SKILL.md` — Same treatment.
+- `skills/services/SKILL.md` — Same treatment.
+- `skills/installed-apps/SKILL.md` — Same treatment.
+- `skills/network/SKILL.md` — Same treatment. Port table updated.
+- `skills/roles-features/SKILL.md` — Same treatment.
+- `skills/event-logs/SKILL.md` — Same treatment.
+- `.github/copilot-instructions.md` — Updated connection workflow, error handling, skills reference. Removed TrustedHosts guidance.
+- `.github/agents/win-investigator.md` — Added connection transport section. Updated error handling.
+- `README.md` + `docs/*.md` — Updated all port references, firewall guidance, TrustedHosts sections.
+
+**Standard splatted pattern for diagnostic skills:**
+```powershell
+$SessionOption = New-PSSessionOption -SkipCACheck -SkipCNCheck
+$invokeParams = @{
+    ComputerName  = $ServerName
+    UseSSL        = $true
+    Port          = 5986
+    SessionOption = $SessionOption
+    ScriptBlock   = $scriptBlock
+    ErrorAction   = 'Stop'
+}
+if ($Credential) { $invokeParams['Credential'] = $Credential }
+$result = Invoke-Command @invokeParams
+```
+
+**Key learning:** A universal connection pattern (HTTPS everywhere, SkipCA/SkipCN, no TrustedHosts) simplifies the entire project dramatically. No more branching logic for Azure vs on-prem, no TrustedHosts management, IP addresses just work.

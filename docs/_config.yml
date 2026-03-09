@@ -1,0 +1,40 @@
+title: Win-Investigator
+description: "AI-driven Windows Server troubleshooting via Copilot CLI"
+remote_theme: just-the-docs/just-the-docs
+
+baseurl: "/win-investigator"
+url: "https://anwather.github.io"
+
+# Search
+search_enabled: true
+search.heading_level: 3
+search.previews: 3
+search.preview_words_before: 5
+search.preview_words_after: 10
+search.tokenizer_separator: /[\s/]+/
+
+# Navigation
+nav_sort: case_insensitive
+
+# Back to top
+back_to_top: true
+back_to_top_text: "Back to top"
+
+# Color scheme
+color_scheme: dark
+
+# Footer
+footer_content: "Built by the Win-Investigator team &mdash; <a href=\"https://github.com/anwather/win-investigator\">GitHub</a>"
+
+# Aux links (top-right)
+aux_links:
+  "View on GitHub":
+    - "https://github.com/anwather/win-investigator"
+aux_links_new_tab: true
+
+# Heading anchor links
+heading_anchors: true
+
+# Plugins
+plugins:
+  - jekyll-remote-theme
