@@ -1,3 +1,8 @@
+---
+name: processes
+description: "Analyze running processes, top CPU/memory consumers on Windows Servers"
+---
+
 # Processes - Running Process Analysis
 
 ## Purpose

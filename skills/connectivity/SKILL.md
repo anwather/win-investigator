@@ -1,3 +1,8 @@
+---
+name: connectivity
+description: "Test connectivity and establish PowerShell remoting sessions to Windows Servers"
+---
+
 # Connectivity - Establish PowerShell Remoting Connection
 
 ## Purpose

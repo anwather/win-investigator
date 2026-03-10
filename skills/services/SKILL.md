@@ -1,3 +1,8 @@
+---
+name: services
+description: "Check Windows service status, startup types, and recent failures"
+---
+
 # Services - Windows Service Status and Health
 
 ## Purpose

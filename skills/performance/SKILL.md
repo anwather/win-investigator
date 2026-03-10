@@ -1,3 +1,8 @@
+---
+name: performance
+description: "Collect CPU, memory, and disk I/O performance metrics from Windows Servers"
+---
+
 # Performance - System Performance Metrics
 
 ## Purpose

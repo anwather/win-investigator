@@ -1,3 +1,8 @@
+---
+name: event-logs
+description: "Analyze Windows Event Logs for errors, warnings, and critical events"
+---
+
 # Event Logs - System Event Analysis
 
 ## Purpose

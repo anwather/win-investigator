@@ -1,3 +1,8 @@
+---
+name: win-investigate
+description: "Main orchestrator skill for Windows Server diagnostics via PowerShell remoting"
+---
+
 # win-investigate
 
 **Main orchestrator skill for Windows Server diagnostics.**

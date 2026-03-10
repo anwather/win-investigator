@@ -1,3 +1,8 @@
+---
+name: server-overview
+description: "Quick system summary including OS, uptime, hardware, and overall health"
+---
+
 # Server Overview - Quick System Summary
 
 ## Purpose

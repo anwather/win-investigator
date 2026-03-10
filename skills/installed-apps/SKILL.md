@@ -1,3 +1,8 @@
+---
+name: installed-apps
+description: "Inventory installed applications and software on Windows Servers"
+---
+
 # Installed Applications - Software Inventory
 
 ## Purpose

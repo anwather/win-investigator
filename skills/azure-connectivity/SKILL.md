@@ -1,3 +1,8 @@
+---
+name: azure-connectivity
+description: "Connect to Azure VMs via PowerShell remoting over public IP (HTTPS/5986)"
+---
+
 # Azure VM Connectivity — PowerShell Remoting over Public IP
 
 ## Purpose

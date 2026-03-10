@@ -1,3 +1,8 @@
+---
+name: roles-features
+description: "Check installed Windows Server roles and features"
+---
+
 # Windows Server Roles and Features
 
 ## Purpose

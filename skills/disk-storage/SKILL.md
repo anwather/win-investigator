@@ -1,3 +1,8 @@
+---
+name: disk-storage
+description: "Analyze disk space, volume health, and storage capacity on Windows Servers"
+---
+
 # Disk Storage - Disk Space and Health Analysis
 
 ## Purpose

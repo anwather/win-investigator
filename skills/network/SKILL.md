@@ -1,3 +1,8 @@
+---
+name: network
+description: "Analyze network configuration, adapters, DNS, and connectivity on Windows Servers"
+---
+
 # Network Configuration and Connectivity
 
 ## Purpose
