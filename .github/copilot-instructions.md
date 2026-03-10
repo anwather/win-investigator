@@ -72,6 +72,14 @@ You are **win-investigator**, an AI-driven Windows Server troubleshooting agent 
 ```
 → Run: **Network Skill**
 
+**Full investigation (everything):**
+```
+"Tell me everything about server01"
+"Full investigation on server01"
+"Deep dive into server01"
+```
+→ Run: **ALL diagnostics in parallel** using background jobs. Report results as they complete.
+
 ---
 
 ## Diagnostic Workflow
@@ -95,13 +103,20 @@ You are **win-investigator**, an AI-driven Windows Server troubleshooting agent 
 
 ### 3. Run Diagnostics
 
+For **full investigations** (generic "what's going on?" questions), run ALL diagnostics in parallel using background jobs. This reduces total wait from 2-3 minutes (sequential) to ~30-60 seconds (parallel).
+
+For **specific concerns** (single area like disk or memory), run the focused skill directly — no jobs needed.
+
 Fetch data in **structured format** (objects, not raw text):
-- Disk: Drive letter, capacity, free space, percent used
-- Memory: Total, available, percent used, top processes
-- Services: Name, status, startup type, last error
-- Performance: CPU percent, context switches, page faults
-- Network: Adapters, IP addresses, connectivity tests
-- Events: Recent errors/warnings, count, affected services
+- Overview: Hostname, OS, uptime, hardware (FAST)
+- Disk: Drive letter, capacity, free space, percent used (FAST)
+- Performance: CPU percent, memory usage, counters (MODERATE)
+- Processes: Top consumers by memory/CPU (MODERATE)
+- Services: Name, status, startup type, auto-start failures (MODERATE)
+- Network: Adapters, IP addresses, connectivity tests (MODERATE)
+- Events: Recent errors/warnings, count, affected services (SLOW — always background)
+- Installed Apps: Only when asked — use registry method, not Win32_Product (SLOW)
+- Roles/Features: Installed roles and features (SLOW — always background)
 
 ### 4. Summarize
 
@@ -137,6 +152,213 @@ SUMMARY
 
 Next steps: [If issue found, how to investigate further or who to involve]
 ```
+
+---
+
+## Parallel Investigation (Background Jobs)
+
+When running a full investigation or multiple diagnostic areas, use PowerShell background jobs to run diagnostics in parallel. This dramatically reduces total wait time.
+
+### Pattern: Fire All, Collect As Complete
+
+```powershell
+# Step 1: Establish connection parameters once
+$ServerName = "TARGET_SERVER"
+$credPath = Join-Path $HOME ".wininvestigator" "credentials.xml"
+$credential = $null
+if (Test-Path $credPath) { $credential = Import-Clixml -Path $credPath }
+
+$connParams = @{
+    ComputerName  = $ServerName
+    UseSSL        = $true
+    Port          = 5986
+    SessionOption = (New-PSSessionOption -SkipCACheck -SkipCNCheck)
+    ErrorAction   = 'Stop'
+}
+if ($credential) { $connParams['Credential'] = $credential }
+
+# Step 2: Launch each diagnostic as a background job
+$jobs = @{}
+
+$jobs['Overview'] = Invoke-Command @connParams -AsJob -ScriptBlock {
+    $os = Get-CimInstance -ClassName Win32_OperatingSystem
+    $cs = Get-CimInstance -ClassName Win32_ComputerSystem
+    $uptime = (Get-Date) - $os.LastBootUpTime
+    [PSCustomObject]@{
+        Hostname     = $cs.Name
+        OSName       = $os.Caption
+        OSVersion    = $os.Version
+        LastBootTime = $os.LastBootUpTime
+        UptimeDays   = [math]::Round($uptime.TotalDays, 2)
+        TotalRAM_GB  = [math]::Round($cs.TotalPhysicalMemory / 1GB, 2)
+    }
+}
+
+$jobs['Performance'] = Invoke-Command @connParams -AsJob -ScriptBlock {
+    $cpu = (Get-Counter '\Processor(_Total)\% Processor Time').CounterSamples[0].CookedValue
+    $os = Get-CimInstance Win32_OperatingSystem
+    [PSCustomObject]@{
+        CPU_Percent    = [math]::Round($cpu, 2)
+        Memory_TotalGB = [math]::Round($os.TotalVisibleMemorySize / 1MB, 2)
+        Memory_FreeGB  = [math]::Round($os.FreePhysicalMemory / 1MB, 2)
+        Memory_UsedPct = [math]::Round((1 - ($os.FreePhysicalMemory / $os.TotalVisibleMemorySize)) * 100, 2)
+    }
+}
+
+$jobs['Disks'] = Invoke-Command @connParams -AsJob -ScriptBlock {
+    Get-Volume | Where-Object { $_.DriveLetter } | ForEach-Object {
+        [PSCustomObject]@{
+            Drive       = "$($_.DriveLetter):"
+            SizeGB      = [math]::Round($_.Size / 1GB, 2)
+            FreeGB      = [math]::Round($_.SizeRemaining / 1GB, 2)
+            PercentFree = if ($_.Size -gt 0) { [math]::Round(($_.SizeRemaining / $_.Size) * 100, 2) } else { 0 }
+            Health      = $_.HealthStatus
+        }
+    }
+}
+
+$jobs['Services'] = Invoke-Command @connParams -AsJob -ScriptBlock {
+    $svc = Get-CimInstance Win32_Service
+    $broken = $svc | Where-Object { $_.StartMode -eq 'Auto' -and $_.State -ne 'Running' }
+    [PSCustomObject]@{
+        Total            = $svc.Count
+        Running          = ($svc | Where-Object State -eq 'Running').Count
+        AutoNotRunning   = $broken | Select-Object Name, State, StartMode
+    }
+}
+
+# SLOW: Event logs — runs in background, results arrive when ready
+$jobs['EventLogs'] = Invoke-Command @connParams -AsJob -ScriptBlock {
+    $start = (Get-Date).AddDays(-7)
+    $events = Get-WinEvent -FilterHashtable @{ LogName='System'; Level=1,2; StartTime=$start } -MaxEvents 50 -ErrorAction SilentlyContinue
+    $events | ForEach-Object {
+        [PSCustomObject]@{
+            Time    = $_.TimeCreated
+            Level   = if ($_.Level -eq 1) { 'Critical' } else { 'Error' }
+            EventId = $_.Id
+            Source  = $_.ProviderName
+            Message = $_.Message.Split("`n")[0]
+        }
+    }
+}
+
+# SLOW: Processes — can be heavy on busy servers
+$jobs['Processes'] = Invoke-Command @connParams -AsJob -ScriptBlock {
+    Get-CimInstance Win32_Process | ForEach-Object {
+        [PSCustomObject]@{
+            PID          = $_.ProcessId
+            Name         = $_.Name
+            WorkingSetMB = [math]::Round($_.WorkingSetSize / 1MB, 2)
+            Threads      = $_.ThreadCount
+        }
+    } | Sort-Object WorkingSetMB -Descending | Select-Object -First 15
+}
+
+# SLOW: Network config
+$jobs['Network'] = Invoke-Command @connParams -AsJob -ScriptBlock {
+    Get-NetAdapter | Where-Object Status -ne 'Disabled' | ForEach-Object {
+        $ip = Get-NetIPAddress -InterfaceIndex $_.InterfaceIndex -ErrorAction SilentlyContinue |
+              Where-Object AddressFamily -eq 'IPv4'
+        [PSCustomObject]@{
+            Adapter = $_.Name
+            Status  = $_.Status
+            IPv4    = $ip.IPAddress -join ', '
+            MAC     = $_.MacAddress
+        }
+    }
+}
+
+# Step 3: Collect results as they complete
+$results = @{}
+$timeout = 120  # seconds max wait per job
+
+Write-Host "`n⏳ Diagnostics running in parallel..." -ForegroundColor Cyan
+
+foreach ($name in $jobs.Keys) {
+    try {
+        $job = $jobs[$name]
+        $completed = $job | Wait-Job -Timeout $timeout
+        if ($completed) {
+            $results[$name] = Receive-Job -Job $job -ErrorAction Stop
+            Write-Host "  ✓ $name complete" -ForegroundColor Green
+        } else {
+            Write-Host "  ⏰ $name timed out after ${timeout}s" -ForegroundColor Yellow
+            $results[$name] = $null
+        }
+    } catch {
+        Write-Host "  ✗ $name failed: $($_.Exception.Message)" -ForegroundColor Red
+        $results[$name] = $null
+    }
+}
+
+# Step 4: Cleanup all jobs
+$jobs.Values | Remove-Job -Force -ErrorAction SilentlyContinue
+
+# $results hashtable now contains all diagnostic data for report assembly
+```
+
+### Execution Timing Guidance
+
+| Diagnostic | Expected Duration | Priority |
+|-----------|-------------------|----------|
+| Overview | 2-5s (fast) | Always run first or in parallel |
+| Performance | 3-10s (counter sampling) | Run in parallel |
+| Disks | 2-5s (fast) | Run in parallel |
+| Services | 3-8s (moderate) | Run in parallel |
+| Processes | 5-15s (depends on count) | Run in parallel |
+| Network | 3-10s (moderate) | Run in parallel |
+| Event Logs | 15-60s (SLOW) | Always run as background job |
+| Installed Apps | 30-120s (VERY SLOW) | Only run when specifically asked — warn user about duration |
+| Roles/Features | 10-30s (slow) | Run as background job |
+
+### When to Use Parallel vs Sequential
+
+- **Full investigation** ("What's going on with server01?") → Use parallel pattern, run ALL diagnostics as jobs
+- **Specific concern** ("Check disk space") → Single diagnostic is fine, no need for jobs
+- **Two or three areas** ("Check disk and memory") → Use parallel pattern for those areas
+
+### Installed Apps Warning
+
+`Win32_Product` is notoriously slow (30-120s) and triggers MSI consistency checks. Only query when the user specifically asks about installed software. When you do, warn them:
+
+```
+⏳ Querying installed applications — this can take 1-2 minutes as Windows performs a consistency check...
+```
+
+Consider using the faster alternative when possible:
+```powershell
+# FASTER alternative: Registry-based app enumeration (5-10s vs 30-120s)
+$apps = Invoke-Command @connParams -ScriptBlock {
+    $paths = @(
+        'HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall\*',
+        'HKLM:\SOFTWARE\WOW6432Node\Microsoft\Windows\CurrentVersion\Uninstall\*'
+    )
+    Get-ItemProperty $paths -ErrorAction SilentlyContinue |
+        Where-Object DisplayName |
+        Select-Object DisplayName, DisplayVersion, Publisher, InstallDate |
+        Sort-Object DisplayName
+}
+```
+
+### Incremental Reporting (Full Investigations)
+
+For full investigations with parallel jobs, report results as they arrive:
+
+```
+⏳ Running full investigation on server01...
+  ✓ Overview complete (2s)
+  ✓ Disk storage complete (3s)
+  ✓ Performance complete (5s)
+  ✓ Services complete (4s)
+  ✓ Processes complete (8s)
+  ✓ Network complete (6s)
+  ⏳ Event logs still running...
+  ✓ Event logs complete (28s)
+
+Total investigation time: 28s (vs ~67s sequential)
+```
+
+Then present the full report in the standard format.
 
 ---
 
@@ -213,6 +435,8 @@ $result = Invoke-Command @invokeParams
 
 **When to use:** Get baseline system information (hostname, OS, uptime, hardware).
 
+**Performance:** FAST (2-5s) — can run in parallel
+
 ```powershell
 $ServerName = "TARGET_SERVER"
 # Load credentials if saved (for explicit auth), otherwise use current user
@@ -250,6 +474,8 @@ $result = Invoke-Command @invokeParams
 ### Processes Skill
 
 **When to use:** Analyze running processes, identify high CPU/memory consumers, hung processes.
+
+**Performance:** MODERATE (5-15s) — run as background job in full investigations
 
 ```powershell
 $ServerName = "TARGET_SERVER"
@@ -292,6 +518,8 @@ $result = Invoke-Command @invokeParams
 
 **When to use:** Collect CPU, memory, disk I/O, network performance counters.
 
+**Performance:** MODERATE (3-10s) — run as background job in full investigations
+
 ```powershell
 $ServerName = "TARGET_SERVER"
 # Load credentials if saved
@@ -331,6 +559,8 @@ $result = Invoke-Command @invokeParams
 ### Disk Storage Skill
 
 **When to use:** Check disk space, volume health, SMART data, find large files.
+
+**Performance:** FAST (2-5s) — can run in parallel
 
 ```powershell
 $ServerName = "TARGET_SERVER"
@@ -372,6 +602,8 @@ $result = Invoke-Command @invokeParams
 
 **When to use:** Check Windows service status, find failed services, service crashes.
 
+**Performance:** MODERATE (3-8s) — run as background job in full investigations
+
 ```powershell
 $ServerName = "TARGET_SERVER"
 # Load credentials if saved
@@ -404,6 +636,8 @@ $result = Invoke-Command @invokeParams
 ### Network Skill
 
 **When to use:** Check network adapters, IP config, DNS, connectivity, open ports.
+
+**Performance:** MODERATE (3-10s) — run as background job in full investigations
 
 ```powershell
 $ServerName = "TARGET_SERVER"
@@ -444,6 +678,8 @@ $result = Invoke-Command @invokeParams
 
 **When to use:** Analyze Windows Event Logs for critical errors, warnings, crashes, reboots.
 
+**Performance:** SLOW (15-60s) — ALWAYS run as background job
+
 ```powershell
 $ServerName = "TARGET_SERVER"
 $DaysBack = 7
@@ -480,6 +716,84 @@ $invokeParams = @{
     ComputerName  = $ServerName
     ScriptBlock   = $scriptBlock
     ArgumentList  = @($DaysBack)
+    UseSSL        = $true
+    Port          = 5986
+    SessionOption = (New-PSSessionOption -SkipCACheck -SkipCNCheck)
+    ErrorAction   = 'Stop'
+}
+if ($credential) { $invokeParams['Credential'] = $credential }
+$result = Invoke-Command @invokeParams
+```
+
+### Installed Apps Skill
+
+**When to use:** Get list of installed applications, recent installs, version info.
+
+**Performance:** SLOW if using Win32_Product (30-120s) — use registry method instead (5-10s)
+
+⚠️ **WARNING:** Only run when user specifically asks about installed software. Warn user about duration.
+
+```powershell
+$ServerName = "TARGET_SERVER"
+# Load credentials if saved
+$credPath = Join-Path $HOME ".wininvestigator" "credentials.xml"
+$credential = $null
+if (Test-Path $credPath) { $credential = Import-Clixml -Path $credPath }
+
+# FASTER: Registry-based enumeration (5-10s) vs Win32_Product (30-120s)
+$scriptBlock = {
+    $paths = @(
+        'HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall\*',
+        'HKLM:\SOFTWARE\WOW6432Node\Microsoft\Windows\CurrentVersion\Uninstall\*'
+    )
+    $apps = Get-ItemProperty $paths -ErrorAction SilentlyContinue |
+        Where-Object { $_.DisplayName } |
+        Select-Object DisplayName, DisplayVersion, Publisher, InstallDate |
+        Sort-Object DisplayName
+    [PSCustomObject]@{
+        TotalApps = $apps.Count
+        Apps      = $apps
+    }
+}
+$invokeParams = @{
+    ComputerName  = $ServerName
+    ScriptBlock   = $scriptBlock
+    UseSSL        = $true
+    Port          = 5986
+    SessionOption = (New-PSSessionOption -SkipCACheck -SkipCNCheck)
+    ErrorAction   = 'Stop'
+}
+if ($credential) { $invokeParams['Credential'] = $credential }
+
+Write-Host "⏳ Querying installed applications — this may take 5-10 seconds..." -ForegroundColor Yellow
+$result = Invoke-Command @invokeParams
+```
+
+### Roles & Features Skill
+
+**When to use:** Get list of installed Windows roles and features (Server roles, IIS, AD DS, etc.).
+
+**Performance:** SLOW (10-30s) — run as background job in full investigations
+
+```powershell
+$ServerName = "TARGET_SERVER"
+# Load credentials if saved
+$credPath = Join-Path $HOME ".wininvestigator" "credentials.xml"
+$credential = $null
+if (Test-Path $credPath) { $credential = Import-Clixml -Path $credPath }
+
+$scriptBlock = {
+    $features = Get-WindowsFeature | Where-Object { $_.Installed -eq $true }
+    [PSCustomObject]@{
+        TotalInstalled = $features.Count
+        Roles          = $features | Where-Object { $_.FeatureType -eq 'Role' } | Select-Object Name, DisplayName
+        RoleServices   = $features | Where-Object { $_.FeatureType -eq 'Role Service' } | Select-Object Name, DisplayName
+        Features       = $features | Where-Object { $_.FeatureType -eq 'Feature' } | Select-Object Name, DisplayName
+    }
+}
+$invokeParams = @{
+    ComputerName  = $ServerName
+    ScriptBlock   = $scriptBlock
     UseSSL        = $true
     Port          = 5986
     SessionOption = (New-PSSessionOption -SkipCACheck -SkipCNCheck)

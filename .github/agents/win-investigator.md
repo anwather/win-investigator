@@ -33,6 +33,8 @@ Parse (identify server, concern, urgency)
 Connect (PowerShell remoting, handle auth)
     ↓
 Diagnose (run focused skills based on concern)
+    - Full investigation: ALL diagnostics in parallel (background jobs)
+    - Specific concern: Single diagnostic, no jobs needed
     ↓
 Summarize (structured report with severity, actions)
     ↓
@@ -49,7 +51,8 @@ Report to User
 - "What is going on with server01?"
 - "Check server01"
 - "server01 is acting weird"
-- **Response:** Run overview + key health checks across all areas
+- "Full investigation on server01"
+- **Response:** Run overview + key health checks across all areas **IN PARALLEL** using background jobs
 
 **Specific ("Check one thing"):**
 - Disk: "server01 is out of space" → disk-storage skill
@@ -75,7 +78,17 @@ Skills are defined in `skills/` at the repo root (modular source files) and embe
 | `memory-cpu` | Slow server, high resource usage | Memory/CPU %, top processes, context switches, page faults |
 | `services-events` | Service won't start, errors in logs | Service status, startup type, recent failures, event log warnings |
 | `network` | Connectivity, network config issues | Network adapters, IP config, connectivity tests, open ports |
+| `installed-apps` | Software inventory, version checks | Installed applications list (registry-based, 5-10s) |
+| `roles-features` | Server roles, Windows features | Installed roles and features (10-30s) |
 | `general-health` | Combination check (overview + key indicators) | Multi-domain health snapshot |
+
+**Performance Notes:**
+- **FAST (2-5s):** overview, disk-storage — run anytime
+- **MODERATE (3-15s):** performance, processes, services, network — use background jobs for full investigations
+- **SLOW (15-60s):** event-logs — ALWAYS run as background job
+- **VERY SLOW (30-120s):** installed-apps (if using Win32_Product) — only run when explicitly requested
+
+**Parallel Execution:** For full investigations, all diagnostics run as background jobs simultaneously, reducing total wait time from 2-3 minutes to ~30-60 seconds.
 
 Each skill returns **structured data** (not raw text), which the agent formats into the diagnostic report.
 

@@ -389,48 +389,133 @@ If all of these pass, try your investigation again.
 
 ## Runtime Issues
 
-### `Error: Command timed out`
+### Investigation is taking longer than expected
 
-**Problem:** Win-Investigator hangs or returns "timed out."
+**Problem:** You expected 30-60 seconds but it's taking 2+ minutes.
 
-**Cause:** Target server is under heavy load, or network latency is high.
+**Cause:** Several slow diagnostics may be running (Event Logs, Roles/Features). Or the target server is under heavy load and responses are slow.
 
 **Solution:**
 
-1. Check if the target server is responsive:
-   ```powershell
-   ping server01
-   ```
+1. **This is expected for full investigations:**
+   - Event Logs diagnostic can take 15-60s depending on log size
+   - Roles/Features diagnostic can take 10-30s
+   - If running both in parallel, worst case is 60s total (not sequential)
+   - Compare to sequential mode: would take 2-3 minutes
 
-2. Check server load (from target):
-   ```powershell
-   Get-Process | Sort-Object CPU -Descending | Select-Object -First 5
-   ```
+2. **If consistently slow (>2 minutes):**
+   - Target server may be under heavy load
+   - Check server responsiveness:
+     ```powershell
+     ping server01
+     Get-Process -ComputerName server01 | Sort-Object CPU -Descending | Select-Object -First 5
+     ```
+   - Try a focused investigation instead:
+     ```
+     ? "Check server01's disk"  ← Faster than full investigation
+     ```
 
-3. Try a simpler diagnostic first:
-   ```
-   ? "Check server01"  ← Lighter than specific diagnostics
-   ```
-
-4. If diagnostics consistently time out, the server may be overloaded. Escalate to on-call admin.
+3. **Background jobs continue running:**
+   - Slow diagnostics run in the background
+   - You see fast results immediately
+   - Slow results arrive as they complete
+   - This is intentional — provides value without waiting
 
 {: .note }
-> Large disk scans or event log searches can take 2-5 minutes on large servers. This is expected.
+> **Timing reference:** Overview + Disk + Network in parallel = ~10-15 seconds. Add Event Logs = ~40-60 seconds total. All jobs run concurrently, not sequentially.
 
 ---
 
-### `Error: Partial results`
+### Job timed out after 120 seconds
 
-**Problem:** Win-Investigator returns incomplete data.
+**Problem:** Full investigation fails with "Operation timed out" after ~2 minutes.
 
-**Cause:** Some checks failed due to:
-- Insufficient permissions (can't read Security event log, for example)
-- PowerShell modules not available on target
-- Older Windows Server versions with fewer cmdlets
+**Cause:** One or more background jobs exceeded the 120-second timeout. This can happen when:
+- Target server is overloaded (CPU/memory maxed)
+- Event log is very large (thousands of entries)
+- Network latency is high
+- Roles/Features enumeration is slow
 
 **Solution:**
 
-Win-Investigator handles this gracefully. It reports what it could collect and notes what failed. This is normal and doesn't prevent useful diagnostics.
+1. **Check target server load:**
+   ```powershell
+   Get-Process -ComputerName server01 | Sort-Object CPU -Descending | Select-Object -First 5
+   Get-CimInstance Win32_OperatingSystem -ComputerName server01 | Select-Object Name, TotalVisibleMemorySize, FreePhysicalMemory
+   ```
+
+2. **If server is overloaded:**
+   - Wait 5-10 minutes and try again
+   - Or investigate specific area instead of full investigation
+
+3. **Try a focused investigation first:**
+   ```
+   ? "Check server01's disk"          ← Fast, no timeout risk
+   ? "What services are running?"      ← Fast
+   ? "Check performance on server01"   ← Moderate speed
+   ```
+
+4. **For Event Log analysis:**
+   - Full Event Log search can take time on large servers
+   - Try specifying a time window:
+     ```
+     ? "Show errors on server01 from the last hour"
+     ```
+
+{: .warning }
+> If a single diagnostic consistently times out, there may be a connectivity or server issue. Try the troubleshooting steps in **Connection Issues** section above.
+
+---
+
+### Partial results — some diagnostics succeeded, others failed
+
+**Problem:** Investigation completes but shows "Failed to collect [diagnostic name]" or similar errors.
+
+**Cause:** Background jobs run independently. One or more may fail due to:
+- Insufficient permissions (can't read Security event log, for example)
+- PowerShell module missing on target
+- Network interruption mid-job
+- Target server process killed mid-operation
+
+**Solution:**
+
+This is **normal and expected**. Win-Investigator is designed to handle partial failure gracefully:
+
+1. **Successful diagnostics are reported normally** — you get findings for those
+2. **Failed diagnostics are noted** — report shows which ones failed and why
+3. **Continue with actionable findings** — act on what succeeded
+
+**Example partial result:**
+```
+Findings collected:
+  ✅ Overview — Success
+  ✅ Disk — Success
+  ✅ Services — Success
+  ⚠️  Event Logs — Failed (access denied to Security log)
+  ✅ Network — Success
+  ❌ Roles/Features — Timed out (10s elapsed)
+
+Report shows: Overview, Disk, Services, Network findings
+Note: Event Logs and Roles/Features partial/failed — not included in report
+```
+
+**If a critical diagnostic fails consistently:**
+
+1. Check permissions (ensure admin/elevated rights):
+   ```powershell
+   $credential = Get-Credential  # Use explicit admin credentials
+   gh copilot
+   ```
+
+2. Try a simpler investigation:
+   ```
+   ? "What is going on with server01?"  ← Tries fewer diagnostics
+   ```
+
+3. If Event Log access denied, verify admin rights on target:
+   ```powershell
+   net localgroup Administrators | findstr /I "youruser"
+   ```
 
 ---
 

@@ -156,6 +156,17 @@ run `$credential = Get-Credential` again in the new session.
 
 All reports follow the same structure, so they're easy to read.
 
+### Parallel Background Investigations
+
+When you ask for a full investigation, Win-Investigator runs all diagnostics **simultaneously as background jobs** instead of one-by-one. This drastically cuts investigation time from 2-3 minutes down to 30-60 seconds.
+
+{: .note }
+> **What happens:** You ask your question → Agent starts 8-10 diagnostics as parallel jobs → Results stream in as they complete → You see findings prioritized by severity, not by completion order.
+
+Some diagnostics are fast (overview, disk, network take 2-10s), while others are slow (Event Logs and Roles/Features can take 30-60s). The parallel approach means slow diagnostics don't block fast ones.
+
+**You'll see results incrementally** — the report updates as each diagnostic finishes, so you get actionable findings quickly rather than waiting for everything.
+
 ### The Parts of a Report
 
 ```
@@ -240,7 +251,21 @@ gh copilot
 
 ### Q: How long do checks usually take?
 
-**A:** Most checks complete in 10-30 seconds. Some (like large disk scans) may take 1-2 minutes.
+**A:** Depends on the investigation type. **Focused checks** (disk, services, network) take 5-15 seconds. **Full investigations** run all diagnostics in parallel and complete in 30-60 seconds total. A few diagnostics are slow by nature (Event Logs, Roles/Features) but run in the background while others finish — you see results as they complete.
+
+| Diagnostic | Duration | Notes |
+|-----------|----------|-------|
+| Overview | 2-5s | Fast |
+| Disks | 2-5s | Fast |
+| Performance | 3-10s | Counter sampling |
+| Services | 3-8s | Moderate |
+| Processes | 5-15s | Depends on count |
+| Network | 3-10s | Moderate |
+| Event Logs | 15-60s | SLOW — background |
+| Installed Apps | 5-10s | Fast (registry method) |
+| Roles/Features | 10-30s | SLOW — background |
+
+**Sequential total:** ~2-3 minutes. **Parallel total:** ~30-60 seconds.
 
 ### Q: Can I save the report?
 

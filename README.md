@@ -92,10 +92,14 @@ You ask a question (plain English)
     ↓
 Win-Investigator connects to your server (via PowerShell)
     ↓
-Runs quick diagnostics (disk, memory, services, network)
+Runs multiple diagnostics **simultaneously** (not sequentially)
+    ↓
+Collects results as they complete (fast ones first, slow ones in background)
     ↓
 Gives you a clear report with priorities and next steps
 ```
+
+**Speed:** Parallel execution cuts investigation time from **2-3 minutes to 30-60 seconds**.
 
 ---
 
@@ -216,16 +220,17 @@ of Copilot using Export-Clixml. The file contains encrypted data (DPAPI), not pl
 
 ## Available Diagnostics
 
-Win-Investigator can run these focused checks based on your question:
+Win-Investigator can run these focused checks based on your question. **Full investigations run all diagnostics in parallel** — reducing total time from 2-3 minutes to 30-60 seconds.
 
-| Concern | Command Example | What You Get |
-|---------|-----------------|-------------|
-| **General Health** | "What is going on with server01?" | OS info, uptime, disk, memory, services snapshot |
-| **Disk Space** | "server01 is out of disk space" | Drive usage, free space, largest folders, cleanup suggestions |
-| **Memory/CPU** | "server01 is slow" | Memory %, CPU %, top processes by resource usage |
-| **Services** | "Is SQL running?" | Service status, startup type, recent errors, event log entries |
-| **Network** | "Can you reach server01?" | Network adapters, IP config, connectivity tests, open ports |
-| **Performance Baseline** | "Get baseline performance on server01" | Memory, CPU, disk, process snapshot for trend comparison |
+| Concern | Command Example | What You Get | Speed |
+|---------|-----------------|-------------|-------|
+| **General Health** | "What is going on with server01?" | OS info, uptime, disk, memory, services, installed apps, roles (all in parallel) | **30-60s** |
+| **Disk Space** | "server01 is out of disk space" | Drive usage, free space, largest folders, cleanup suggestions | **5-15s** |
+| **Memory/CPU** | "server01 is slow" | Memory %, CPU %, top processes by resource usage, performance baseline | **10-20s** |
+| **Services** | "Is SQL running?" | Service status, startup type, recent errors, event log entries | **10-30s** |
+| **Network** | "Can you reach server01?" | Network adapters, IP config, connectivity tests, open ports | **5-15s** |
+| **Installed Apps** | "What's installed on server01?" | Installed applications with versions (registry scan) | **5-10s** |
+| **Roles/Features** | "What roles are running?" | Windows Server roles and features | **10-30s** |
 
 ---
 

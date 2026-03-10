@@ -35,28 +35,99 @@ Invoke this skill when the user asks about:
 
 The skill can investigate these areas (modular, can be invoked independently):
 
-- **Processes** — Top CPU/memory consumers, unusual processes
-- **Performance** — CPU usage, memory pressure, disk I/O
-- **Disks** — Free space, capacity, volumes
-- **Services** — Stopped services that should be running, recent failures
-- **Installed Apps** — Recently installed software, version info
-- **Network Config** — IP configuration, DNS settings, connectivity
-- **Roles & Features** — Installed Windows roles/features
+- **Overview** — OS version, uptime, hostname, hardware (FAST: 2-5s)
+- **Processes** — Top CPU/memory consumers, unusual processes (MODERATE: 5-15s)
+- **Performance** — CPU usage, memory pressure, disk I/O (MODERATE: 3-10s)
+- **Disks** — Free space, capacity, volumes (FAST: 2-5s)
+- **Services** — Stopped services that should be running, recent failures (MODERATE: 3-8s)
+- **Network Config** — IP configuration, DNS settings, connectivity (MODERATE: 3-10s)
+- **Event Logs** — Critical errors, warnings, crashes (SLOW: 15-60s)
+- **Installed Apps** — Recently installed software, version info (SLOW: 5-10s registry, 30-120s Win32_Product)
+- **Roles & Features** — Installed Windows roles/features (SLOW: 10-30s)
+
+## Parallel Execution for Full Investigations
+
+For full investigations (user asks "what's going on?" or "check everything"), run ALL diagnostics as background jobs in parallel:
+
+**Benefits:**
+- Reduces total wait time from 2-3 minutes (sequential) to ~30-60 seconds (parallel)
+- User gets incremental progress updates as jobs complete
+- Slow diagnostics (event logs, roles) don't block fast ones (overview, disks)
+
+**Pattern:**
+```powershell
+# Launch all diagnostics as background jobs using -AsJob with Invoke-Command
+$jobs = @{}
+$jobs['Overview'] = Invoke-Command @connParams -AsJob -ScriptBlock { ... }
+$jobs['Disks'] = Invoke-Command @connParams -AsJob -ScriptBlock { ... }
+$jobs['Performance'] = Invoke-Command @connParams -AsJob -ScriptBlock { ... }
+# ... etc
+
+# Collect results as they complete with timeout
+foreach ($name in $jobs.Keys) {
+    $job = $jobs[$name]
+    $completed = $job | Wait-Job -Timeout 120
+    if ($completed) {
+        $results[$name] = Receive-Job -Job $job
+        Write-Host "  ✓ $name complete" -ForegroundColor Green
+    }
+}
+```
+
+**When to use parallel execution:**
+- Full investigations (generic "what's going on?" questions)
+- Multiple diagnostic areas requested at once (2+ areas)
+
+**When NOT to use parallel execution:**
+- Single specific concern (just check disk, just check one service)
+- User asks about one specific metric
 
 ## PowerShell Remoting Approach
 
+**Sequential (single diagnostic):**
 ```powershell
-# Connection pattern
-$session = New-PSSession -ComputerName $serverName -Credential $credential -ErrorAction Stop
-
-# Invoke diagnostics
-$results = Invoke-Command -Session $session -ScriptBlock {
-    # Collect diagnostic data
-    # Return structured object
+# One-shot connection for focused diagnostics
+$invokeParams = @{
+    ComputerName  = $ServerName
+    UseSSL        = $true
+    Port          = 5986
+    SessionOption = (New-PSSessionOption -SkipCACheck -SkipCNCheck)
+    ScriptBlock   = { # Diagnostic code here }
+    ErrorAction   = 'Stop'
 }
+if ($credential) { $invokeParams['Credential'] = $credential }
+$result = Invoke-Command @invokeParams
+```
 
-# Cleanup
-Remove-PSSession -Session $session
+**Parallel (full investigation):**
+```powershell
+# Establish connection params once
+$connParams = @{
+    ComputerName  = $ServerName
+    UseSSL        = $true
+    Port          = 5986
+    SessionOption = (New-PSSessionOption -SkipCACheck -SkipCNCheck)
+    ErrorAction   = 'Stop'
+}
+if ($credential) { $connParams['Credential'] = $credential }
+
+# Launch each diagnostic as a background job
+$jobs = @{}
+$jobs['Overview'] = Invoke-Command @connParams -AsJob -ScriptBlock { ... }
+$jobs['Performance'] = Invoke-Command @connParams -AsJob -ScriptBlock { ... }
+$jobs['Disks'] = Invoke-Command @connParams -AsJob -ScriptBlock { ... }
+# ... etc
+
+# Collect results as they complete
+$results = @{}
+foreach ($name in $jobs.Keys) {
+    $job = $jobs[$name]
+    $completed = $job | Wait-Job -Timeout 120
+    if ($completed) {
+        $results[$name] = Receive-Job -Job $job -ErrorAction Stop
+    }
+}
+$jobs.Values | Remove-Job -Force -ErrorAction SilentlyContinue
 ```
 
 ## Error Handling

@@ -8,6 +8,8 @@ description: "Check installed Windows Server roles and features"
 ## Purpose
 Inventory installed Windows Server roles, role services, and features to understand server configuration and identify potential issues.
 
+**Performance:** SLOW (10-30s) — run as background job in full investigations
+
 ## PowerShell Code
 
 ### Complete Roles and Features Inventory

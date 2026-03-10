@@ -145,16 +145,22 @@ The agent establishes a connection:
 
 ### 3. Diagnose
 
-The agent routes to one or more diagnostic skills:
+The agent routes to one or more diagnostic skills, executing them **in parallel as background jobs**:
 
-| Concern | Skills Used |
-|---------|-------------|
-| General health | server-overview + performance + services |
-| Disk space | disk-storage |
-| Slow performance | performance + processes |
-| Service issue | services + event-logs |
-| Network problem | connectivity + network |
-| Application issue | processes + installed-apps + event-logs |
+| Concern | Skills Used | Parallel Execution | Timing |
+|---------|-------------|-------------------|--------|
+| General health | server-overview + performance + services | Yes (all run together) | ~30-60s total |
+| Disk space | disk-storage + processes | Yes | ~10-15s |
+| Slow performance | performance + processes + services | Yes | ~15-30s |
+| Service issue | services + event-logs | Yes (runs in background) | ~30-60s |
+| Network problem | connectivity + network | Yes | ~10-15s |
+| Application issue | processes + installed-apps + event-logs | Yes | ~30-60s |
+
+**Parallel execution benefits:**
+- Fast diagnostics (2-5s) don't wait for slow ones (30-60s)
+- Results stream in as they complete
+- Total investigation time: **30-60 seconds** (vs. 2-3 minutes sequential)
+- Slow operations (Event Logs, Roles/Features) run as background jobs
 
 ### 4. Report
 
@@ -242,7 +248,31 @@ if ($Credential) { $invokeParams['Credential'] = $Credential }
 $result = Invoke-Command @invokeParams
 ```
 
-Key conventions:
+### Parallel Job Execution Pattern
+
+For full investigations, multiple diagnostics run simultaneously as background jobs:
+
+```powershell
+# Start all diagnostics as parallel jobs
+$jobs = @()
+$jobs += Invoke-Command @invokeParams -AsJob -JobName "overview"
+$jobs += Invoke-Command @invokeParams -AsJob -JobName "disk"
+$jobs += Invoke-Command @invokeParams -AsJob -JobName "performance"
+# ... more jobs
+
+# Collect results as they complete (not in any particular order)
+$results = @()
+foreach ($job in $jobs) {
+    $result = Receive-Job -Job $job -Wait
+    $results += $result  # Add to results incrementally
+}
+
+# Report findings prioritized by severity (not completion order)
+```
+
+**Key benefit:** Event Logs and Roles/Features (30-60s) run in the background while fast diagnostics (2-5s) complete and get reported immediately.
+
+### Code Patterns (continued)
 - **CIM over WMI** — `Get-CimInstance` not `Get-WmiObject`
 - **Structured returns** — PSObjects, not formatted text
 - **Error handling** — try/catch with meaningful error messages

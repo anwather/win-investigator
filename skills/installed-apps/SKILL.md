@@ -8,6 +8,10 @@ description: "Inventory installed applications and software on Windows Servers"
 ## Purpose
 Get a list of installed applications, recent installations/updates, software versions, and identify potentially problematic software.
 
+**Performance:** SLOW (5-10s with registry method, 30-120s with Win32_Product)
+
+⚠️ **IMPORTANT:** This skill uses the fast registry-based method (5-10s). NEVER use `Get-CimInstance Win32_Product` as it triggers MSI consistency checks and takes 30-120 seconds. Only run when user specifically asks about installed software.
+
 ## PowerShell Code
 
 ### Complete Installed Applications Inventory
