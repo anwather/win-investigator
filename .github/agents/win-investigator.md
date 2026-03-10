@@ -19,7 +19,7 @@ description: "AI-driven Windows Server troubleshooting via PowerShell remoting a
 - **Purpose:** Windows Server troubleshooting and diagnostics
 - **Input:** Natural language questions about server health, performance, services, connectivity
 - **Output:** Structured diagnostic reports with severity indicators and actionable next steps
-- **Model:** Uses Copilot CLI agent orchestration; runs diagnostic skills from `.squad/skills/`
+- **Model:** Uses Copilot CLI agent orchestration; diagnostic skill code is embedded in copilot-instructions.md for automatic loading
 
 ---
 
@@ -66,7 +66,7 @@ Report to User
 
 ## Skills
 
-Skills are stored in `.squad/skills/` and implement specific diagnostic domains.
+Skills are defined in `skills/` at the repo root (modular source files) and embedded into `.github/copilot-instructions.md` (runtime reference). When a user runs `gh copilot`, the instructions file loads automatically with all skill code available.
 
 | Skill | When to Use | Output |
 |-------|-----------|--------|
@@ -308,26 +308,24 @@ Do NOT attempt to restart services, modify permissions, add disk space, or chang
 
 ## Skills Directory Reference
 
-Skills are implemented in PowerShell and live at `.squad/skills/`. Each skill:
+Skills are implemented in PowerShell and source files live at `skills/` (repo root). The PowerShell code is embedded directly into `.github/copilot-instructions.md`, which is automatically loaded by Copilot CLI when a user runs `gh copilot` in this repo. This ensures all diagnostic code is immediately available without manual skill installation.
 
+**Maintenance pattern:**
+- Source of truth: `skills/*/SKILL.md` (modular, maintainable)
+- Runtime reference: `.github/copilot-instructions.md` (embedded, auto-loaded)
+
+Each skill:
 1. Accepts server name/IP and optional credentials
-2. Connects via PowerShell remoting or CIM sessions
-3. Collects structured data (not raw text output)
-4. Returns results as PowerShell objects the agent can format
-
-Example skill invocation (pseudocode):
-```
-Invoke-DiagnosticSkill -SkillName "disk-storage" `
-  -ServerName "server01" `
-  -Credential $cred
-```
+2. Connects via PowerShell remoting (HTTPS/5986) with `-SkipCACheck -SkipCNCheck`
+3. Collects structured data (returns PSCustomObjects, not raw text)
+4. Returns results the agent can format and interpret
 
 ---
 
 ## Files
 
-- **Instructions:** `.github/copilot-instructions.md` (this file's companion — full agent instructions)
-- **Skills:** `.squad/skills/` (diagnostic implementations)
+- **Instructions:** `.github/copilot-instructions.md` (full agent instructions with embedded skill code — auto-loaded by Copilot CLI)
+- **Skills (source):** `skills/*/SKILL.md` (modular skill source files for maintenance)
 - **README:** `README.md` (user-facing documentation)
 
 ---

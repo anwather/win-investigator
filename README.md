@@ -62,6 +62,8 @@ gh repo clone anwather/win-investigator
 cd win-investigator
 ```
 
+**That's it!** All diagnostic skills are built-in and automatically loaded when you run `gh copilot` in this directory. No manual skill installation or configuration needed.
+
 ### Step 4: Start Your First Investigation
 
 ```bash
@@ -79,7 +81,7 @@ Ask anything about your Windows Servers, like:
   - "server03 is slow — what's using the CPU?"
 ```
 
-Type your question and press Enter. The agent and skills are automatically available.
+Type your question and press Enter. The agent loads automatically with all diagnostic skills embedded—no installation or setup needed.
 
 ---
 

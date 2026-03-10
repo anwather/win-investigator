@@ -140,19 +140,337 @@ Next steps: [If issue found, how to investigate further or who to involve]
 
 ---
 
-## Skills Reference
+## Diagnostic Skills Reference
 
-Skills live in `.squad/skills/` and implement domain-specific diagnostics.
+All diagnostic skill code is embedded below for automatic availability. When diagnosing server issues, use these PowerShell patterns directly.
 
-- **overview** — OS version, uptime, system info, baseline health
-- **disk-storage** — Drive capacity, free space, large files, temp folder sizes
-- **memory-cpu** — Memory usage, top processes, CPU utilization, context switches
-- **services-events** — Service status, startup type, recent errors, event log warnings
-- **network** — Network adapters, IP config, connectivity tests, open ports
-- **general-health** — Combination check (runs key indicators across all areas)
-- **azure-connectivity** — Azure VM remoting over public IP (NSG rules, WinRM HTTPS setup, alternatives)
+### Connectivity Skill
 
-When running a skill, provide context from the user's question and let the skill logic handle the data collection.
+**When to use:** Test connectivity and establish PowerShell remoting session before diagnostics.
+
+**Key pattern:** All connections use HTTPS on port 5986 with `-SkipCACheck -SkipCNCheck`.
+
+```powershell
+# Test basic connectivity
+$ServerName = "TARGET_SERVER"
+$tcpTest = Test-NetConnection -ComputerName $ServerName -Port 5986 -WarningAction SilentlyContinue
+if ($tcpTest.TcpTestSucceeded) {
+    Write-Host "✓ Port 5986 (WinRM HTTPS) is reachable" -ForegroundColor Green
+} else {
+    Write-Warning "✗ Port 5986 is NOT reachable — check firewall rules"
+}
+
+# Test WinRM over HTTPS
+Test-WSMan -ComputerName $ServerName -UseSSL -ErrorAction Stop
+
+# Establish PSSession
+$Credential = $null  # For current user, or use Get-Credential for explicit creds
+$SessionOption = New-PSSessionOption -SkipCACheck -SkipCNCheck
+$session = New-PSSession -ComputerName $ServerName -UseSSL -Port 5986 -SessionOption $SessionOption -Credential $Credential -ErrorAction Stop
+
+# One-shot Invoke-Command
+$SessionOption = New-PSSessionOption -SkipCACheck -SkipCNCheck
+$invokeParams = @{
+    ComputerName  = $ServerName
+    UseSSL        = $true
+    Port          = 5986
+    SessionOption = $SessionOption
+    ScriptBlock   = { Get-ComputerInfo | Select ComputerName, OsName, OsVersion }
+    ErrorAction   = 'Stop'
+}
+if ($Credential) { $invokeParams['Credential'] = $Credential }
+$result = Invoke-Command @invokeParams
+```
+
+### Server Overview Skill
+
+**When to use:** Get baseline system information (hostname, OS, uptime, hardware).
+
+```powershell
+$ServerName = "TARGET_SERVER"
+$Credential = $null
+$scriptBlock = {
+    $os = Get-CimInstance -ClassName Win32_OperatingSystem
+    $cs = Get-CimInstance -ClassName Win32_ComputerSystem
+    $uptime = (Get-Date) - $os.LastBootUpTime
+    [PSCustomObject]@{
+        Hostname        = $cs.Name
+        OSName          = $os.Caption
+        OSVersion       = $os.Version
+        LastBootTime    = $os.LastBootUpTime
+        UptimeDays      = [math]::Round($uptime.TotalDays, 2)
+        TotalRAM_GB     = [math]::Round($cs.TotalPhysicalMemory / 1GB, 2)
+        Manufacturer    = $cs.Manufacturer
+        Model           = $cs.Model
+    }
+}
+$invokeParams = @{
+    ComputerName  = $ServerName
+    ScriptBlock   = $scriptBlock
+    UseSSL        = $true
+    Port          = 5986
+    SessionOption = (New-PSSessionOption -SkipCACheck -SkipCNCheck)
+    ErrorAction   = 'Stop'
+}
+if ($Credential) { $invokeParams['Credential'] = $Credential }
+$result = Invoke-Command @invokeParams
+```
+
+### Processes Skill
+
+**When to use:** Analyze running processes, identify high CPU/memory consumers, hung processes.
+
+```powershell
+$ServerName = "TARGET_SERVER"
+$Credential = $null
+$scriptBlock = {
+    $processes = Get-CimInstance -ClassName Win32_Process
+    $processData = $processes | ForEach-Object {
+        [PSCustomObject]@{
+            ProcessId       = $_.ProcessId
+            Name            = $_.Name
+            WorkingSetMB    = [math]::Round($_.WorkingSetSize / 1MB, 2)
+            ThreadCount     = $_.ThreadCount
+            HandleCount     = $_.HandleCount
+        }
+    }
+    $topMemory = $processData | Sort-Object WorkingSetMB -Descending | Select-Object -First 10
+    [PSCustomObject]@{
+        TotalProcesses = $processData.Count
+        TopMemory      = $topMemory
+        AllProcesses   = $processData
+    }
+}
+$invokeParams = @{
+    ComputerName  = $ServerName
+    ScriptBlock   = $scriptBlock
+    UseSSL        = $true
+    Port          = 5986
+    SessionOption = (New-PSSessionOption -SkipCACheck -SkipCNCheck)
+    ErrorAction   = 'Stop'
+}
+if ($Credential) { $invokeParams['Credential'] = $Credential }
+$result = Invoke-Command @invokeParams
+```
+
+### Performance Skill
+
+**When to use:** Collect CPU, memory, disk I/O, network performance counters.
+
+```powershell
+$ServerName = "TARGET_SERVER"
+$Credential = $null
+$scriptBlock = {
+    $cpuCounter = Get-Counter '\Processor(_Total)\% Processor Time'
+    $cpuAvg = [math]::Round($cpuCounter.CounterSamples[0].CookedValue, 2)
+    
+    $os = Get-CimInstance Win32_OperatingSystem
+    $totalMemGB = [math]::Round($os.TotalVisibleMemorySize / 1MB, 2)
+    $freeMemGB = [math]::Round($os.FreePhysicalMemory / 1MB, 2)
+    $memPercent = [math]::Round((($totalMemGB - $freeMemGB) / $totalMemGB) * 100, 2)
+    
+    [PSCustomObject]@{
+        CPU_PercentUsed    = $cpuAvg
+        Memory_TotalGB     = $totalMemGB
+        Memory_FreeGB      = $freeMemGB
+        Memory_PercentUsed = $memPercent
+        Timestamp          = Get-Date
+    }
+}
+$invokeParams = @{
+    ComputerName  = $ServerName
+    ScriptBlock   = $scriptBlock
+    UseSSL        = $true
+    Port          = 5986
+    SessionOption = (New-PSSessionOption -SkipCACheck -SkipCNCheck)
+    ErrorAction   = 'Stop'
+}
+if ($Credential) { $invokeParams['Credential'] = $Credential }
+$result = Invoke-Command @invokeParams
+```
+
+### Disk Storage Skill
+
+**When to use:** Check disk space, volume health, SMART data, find large files.
+
+```powershell
+$ServerName = "TARGET_SERVER"
+$Credential = $null
+$scriptBlock = {
+    $volumes = Get-Volume | Where-Object { $_.DriveLetter }
+    $volumeData = $volumes | ForEach-Object {
+        [PSCustomObject]@{
+            DriveLetter  = "$($_.DriveLetter):"
+            SizeGB       = [math]::Round($_.Size / 1GB, 2)
+            FreeGB       = [math]::Round($_.SizeRemaining / 1GB, 2)
+            PercentFree  = [math]::Round(($_.SizeRemaining / $_.Size) * 100, 2)
+            HealthStatus = $_.HealthStatus
+        }
+    }
+    $lowSpace = $volumeData | Where-Object { $_.PercentFree -lt 15 -and $_.SizeGB -gt 1 }
+    [PSCustomObject]@{
+        Volumes         = $volumeData
+        LowSpaceVolumes = $lowSpace
+    }
+}
+$invokeParams = @{
+    ComputerName  = $ServerName
+    ScriptBlock   = $scriptBlock
+    UseSSL        = $true
+    Port          = 5986
+    SessionOption = (New-PSSessionOption -SkipCACheck -SkipCNCheck)
+    ErrorAction   = 'Stop'
+}
+if ($Credential) { $invokeParams['Credential'] = $Credential }
+$result = Invoke-Command @invokeParams
+```
+
+### Services Skill
+
+**When to use:** Check Windows service status, find failed services, service crashes.
+
+```powershell
+$ServerName = "TARGET_SERVER"
+$Credential = $null
+$scriptBlock = {
+    $services = Get-CimInstance -ClassName Win32_Service
+    $shouldBeRunning = $services | Where-Object { $_.StartMode -eq "Auto" -and $_.State -ne "Running" }
+    [PSCustomObject]@{
+        TotalServices       = $services.Count
+        RunningCount        = ($services | Where-Object { $_.State -eq "Running" }).Count
+        AutoStartNotRunning = $shouldBeRunning
+        AllServices         = $services
+    }
+}
+$invokeParams = @{
+    ComputerName  = $ServerName
+    ScriptBlock   = $scriptBlock
+    UseSSL        = $true
+    Port          = 5986
+    SessionOption = (New-PSSessionOption -SkipCACheck -SkipCNCheck)
+    ErrorAction   = 'Stop'
+}
+if ($Credential) { $invokeParams['Credential'] = $Credential }
+$result = Invoke-Command @invokeParams
+```
+
+### Network Skill
+
+**When to use:** Check network adapters, IP config, DNS, connectivity, open ports.
+
+```powershell
+$ServerName = "TARGET_SERVER"
+$Credential = $null
+$scriptBlock = {
+    $adapters = Get-NetAdapter | Where-Object { $_.Status -ne "Disabled" }
+    $adapterInfo = $adapters | ForEach-Object {
+        $ipConfig = Get-NetIPAddress -InterfaceIndex $_.InterfaceIndex -ErrorAction SilentlyContinue
+        $ipv4 = $ipConfig | Where-Object { $_.AddressFamily -eq "IPv4" }
+        [PSCustomObject]@{
+            Name        = $_.Name
+            Status      = $_.Status
+            IPv4Address = $ipv4.IPAddress -join ", "
+            MacAddress  = $_.MacAddress
+        }
+    }
+    [PSCustomObject]@{
+        Adapters = $adapterInfo
+    }
+}
+$invokeParams = @{
+    ComputerName  = $ServerName
+    ScriptBlock   = $scriptBlock
+    UseSSL        = $true
+    Port          = 5986
+    SessionOption = (New-PSSessionOption -SkipCACheck -SkipCNCheck)
+    ErrorAction   = 'Stop'
+}
+if ($Credential) { $invokeParams['Credential'] = $Credential }
+$result = Invoke-Command @invokeParams
+```
+
+### Event Logs Skill
+
+**When to use:** Analyze Windows Event Logs for critical errors, warnings, crashes, reboots.
+
+```powershell
+$ServerName = "TARGET_SERVER"
+$Credential = $null
+$DaysBack = 7
+$scriptBlock = {
+    param($days)
+    $startDate = (Get-Date).AddDays(-$days)
+    $systemEvents = Get-WinEvent -FilterHashtable @{
+        LogName   = 'System'
+        Level     = 1, 2  # Critical = 1, Error = 2
+        StartTime = $startDate
+    } -MaxEvents 50 -ErrorAction SilentlyContinue
+    
+    $eventData = $systemEvents | ForEach-Object {
+        [PSCustomObject]@{
+            TimeCreated = $_.TimeCreated
+            LogName     = $_.LogName
+            Level       = if ($_.Level -eq 1) { "Critical" } else { "Error" }
+            EventId     = $_.Id
+            Source      = $_.ProviderName
+            Message     = $_.Message.Split("`n")[0]
+        }
+    }
+    [PSCustomObject]@{
+        TotalEvents = $eventData.Count
+        Events      = $eventData
+    }
+}
+$invokeParams = @{
+    ComputerName  = $ServerName
+    ScriptBlock   = $scriptBlock
+    ArgumentList  = @($DaysBack)
+    UseSSL        = $true
+    Port          = 5986
+    SessionOption = (New-PSSessionOption -SkipCACheck -SkipCNCheck)
+    ErrorAction   = 'Stop'
+}
+if ($Credential) { $invokeParams['Credential'] = $Credential }
+$result = Invoke-Command @invokeParams
+```
+
+### Azure Connectivity Skill
+
+**When to use:** Connect to Azure VMs over public IP. Always requires explicit credentials.
+
+**Prerequisites:**
+- NSG inbound rule for TCP 5986
+- WinRM HTTPS listener on the VM
+- Explicit credentials (Kerberos doesn't work over public IP)
+
+```powershell
+# Step 1: Verify NSG allows port 5986
+az network nsg rule list --resource-group "YOUR_RG" --nsg-name "YOUR_NSG" --query "[?destinationPortRange=='5986']"
+
+# Step 2: Configure WinRM HTTPS on Azure VM (via Run Command or RDP)
+$cert = New-SelfSignedCertificate -DnsName $env:COMPUTERNAME -CertStoreLocation Cert:\LocalMachine\My
+winrm create winrm/config/Listener?Address=*+Transport=HTTPS "@{Hostname=`"$env:COMPUTERNAME`"; CertificateThumbprint=`"$($cert.Thumbprint)`"}"
+New-NetFirewallRule -DisplayName "WinRM HTTPS" -Direction Inbound -Protocol TCP -LocalPort 5986 -Action Allow
+
+# Step 3: Test connectivity
+$ServerName = "20.100.50.25"  # Azure public IP
+Test-NetConnection -ComputerName $ServerName -Port 5986
+
+# Step 4: Establish session with explicit credentials
+$Credential = Get-Credential -Message "Enter Azure VM credentials for $ServerName"
+$SessionOption = New-PSSessionOption -SkipCACheck -SkipCNCheck
+$session = New-PSSession -ComputerName $ServerName -Credential $Credential -UseSSL -Port 5986 -SessionOption $SessionOption
+```
+
+**Username formats for Azure VMs:**
+- Local account: `.\AdminUser` or `VMName\AdminUser`
+- Azure AD account: `user@domain.com`
+
+**Alternative approaches:**
+- Azure Bastion (secure RDP/SSH without public IP)
+- Azure Serial Console (emergency console access)
+- Azure Run Command (execute scripts without WinRM)
+- Azure VPN/ExpressRoute (private network connectivity)
 
 ---
 

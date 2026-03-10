@@ -73,10 +73,10 @@ Present results as:
 ## Credential Flow
 
 - **Default:** Use current user credentials (no explicit credential object)
-- **Explicit:** If user provides credentials, create PSCredential object:
+- **Explicit:** If user needs alternate credentials, use Get-Credential to open secure Windows dialog:
   ```powershell
-  $securePassword = ConvertTo-SecureString $password -AsPlainText -Force
-  $credential = New-Object System.Management.Automation.PSCredential($username, $securePassword)
+  $Credential = Get-Credential -UserName "domain\admin" -Message "Enter credentials for ServerName"
+  # User enters password in GUI dialog, NOT in chat
   ```
 
 ## Skill Implementation Notes

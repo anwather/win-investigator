@@ -190,3 +190,42 @@ if ($Credential) { $params['Credential'] = $Credential }
 - Never accept passwords typed in conversation
 
 **Outcome:** All credential handling is now secure. Passwords can never appear in chat history. Users enter credentials via Windows GUI dialog or pre-store them in Credential Manager.
+
+---
+
+### Automatic Skill Loading Implemented (2026-03-09T2340)
+
+**Context:** Diagnostic skills live in `skills/` directory but are NOT automatically loaded by Copilot CLI when users run `gh copilot`. Only `.github/copilot-instructions.md` is automatically loaded. Users would need to manually reference skill files, making setup complex.
+
+**Problem:** Skills in `skills/*/SKILL.md` are not automatically available to the agent. Manual skill installation or reference would be required, creating friction.
+
+**Solution Implemented:** Embed all diagnostic skill PowerShell code directly into `.github/copilot-instructions.md`.
+
+**What Changed:**
+1. **Added new section to `.github/copilot-instructions.md`:** "Diagnostic Skills Reference" containing all runnable PowerShell code from each skill
+2. **Skills embedded:** connectivity, server-overview, processes, performance, disk-storage, services, network, event-logs, azure-connectivity
+3. **Code extraction:** Only essential PowerShell code blocks included (no explanatory prose), keeping the instructions file concise and runnable
+4. **Fixed all path references:**
+   - `.github/agents/win-investigator.md`: Changed `.squad/skills/` to `skills/` (lines 22, 69, 311-312, 330) and added note that skills are embedded
+   - `.github/skills/win-investigate.md`: Fixed credential pattern from unsafe `ConvertTo-SecureString -AsPlainText` to secure `Get-Credential` dialog (lines 78-79)
+5. **Updated documentation:**
+   - `docs/getting-started.md`: Added explanation that skills are automatically available, no installation needed
+   - `README.md`: Clarified that skills are built-in and automatically loaded
+
+**Maintenance Pattern:**
+- **Source of truth:** `skills/*/SKILL.md` files remain the modular, maintainable source
+- **Runtime reference:** `.github/copilot-instructions.md` contains embedded skill code (what the agent actually uses)
+- **When updating skills:** Edit the source file in `skills/`, then re-sync the embedded code in copilot-instructions.md
+
+**Files Updated (6 total):**
+1. `.github/copilot-instructions.md` — Added "Diagnostic Skills Reference" section with all embedded skill code
+2. `.github/agents/win-investigator.md` — Fixed path references from `.squad/skills/` to `skills/`, added note about embedded skills
+3. `.github/skills/win-investigate.md` — Fixed credential pattern to use Get-Credential
+4. `docs/getting-started.md` — Added explanation that skills are automatically loaded
+5. `README.md` — Clarified built-in skills, no installation step
+6. `.squad/agents/mulder/history.md` — This file (documenting the change)
+
+**Connection Pattern Reminder:** ALL connections use HTTPS on port 5986 with `-SkipCACheck -SkipCNCheck`. This universal pattern works for domain servers, workgroup servers, Azure VMs, and direct IP addresses without TrustedHosts modification.
+
+**Outcome:** SUCCESS. When users clone the repo and run `gh copilot`, all diagnostic skills are immediately available in the agent's context. No manual installation, no extra steps, no path configuration. Just works.
+
