@@ -8,7 +8,8 @@ Analyze disk storage including volume space, disk health, SMART data, and identi
 ### Complete Disk Storage Analysis
 ```powershell
 $ServerName = "TARGET_SERVER"
-$Credential = $null  # Set if needed
+# For current user (default): no credential needed
+# For explicit credentials: check if $credential variable exists (user must create BEFORE running gh copilot)
 
 $scriptBlock = {
     try {
@@ -94,8 +95,8 @@ try {
     SessionOption = (New-PSSessionOption -SkipCACheck -SkipCNCheck)
     }
     
-    if ($Credential) {
-        $invokeParams['Credential'] = $Credential
+    if ($credential) {
+        $invokeParams['Credential'] = $credential
     }
     
     Write-Host "`nAnalyzing disk storage on $ServerName..." -ForegroundColor Cyan
@@ -138,7 +139,8 @@ try {
 ### Get SMART Data (Physical Disk Health)
 ```powershell
 $ServerName = "TARGET_SERVER"
-$Credential = $null
+# For current user (default): no credential needed
+# For explicit credentials: check if $credential variable exists (user must create BEFORE running gh copilot)
 
 $scriptBlock = {
     try {
@@ -179,8 +181,8 @@ try {
     SessionOption = (New-PSSessionOption -SkipCACheck -SkipCNCheck)
     }
     
-    if ($Credential) {
-        $invokeParams['Credential'] = $Credential
+    if ($credential) {
+        $invokeParams['Credential'] = $credential
     }
     
     Write-Host "`nRetrieving SMART data from $ServerName..." -ForegroundColor Cyan
@@ -219,7 +221,8 @@ try {
 ### Find Large Files/Folders
 ```powershell
 $ServerName = "TARGET_SERVER"
-$Credential = $null
+# For current user (default): no credential needed
+# For explicit credentials: check if $credential variable exists (user must create BEFORE running gh copilot)
 $DriveLetter = "C"
 $TopN = 20
 
@@ -274,8 +277,8 @@ try {
     SessionOption = (New-PSSessionOption -SkipCACheck -SkipCNCheck)
     }
     
-    if ($Credential) {
-        $invokeParams['Credential'] = $Credential
+    if ($credential) {
+        $invokeParams['Credential'] = $credential
     }
     
     $largeItems = Invoke-Command @invokeParams
@@ -293,7 +296,8 @@ try {
 ### Check Disk I/O Statistics
 ```powershell
 $ServerName = "TARGET_SERVER"
-$Credential = $null
+# For current user (default): no credential needed
+# For explicit credentials: check if $credential variable exists (user must create BEFORE running gh copilot)
 
 $scriptBlock = {
     try {
@@ -331,8 +335,8 @@ try {
     SessionOption = (New-PSSessionOption -SkipCACheck -SkipCNCheck)
     }
     
-    if ($Credential) {
-        $invokeParams['Credential'] = $Credential
+    if ($credential) {
+        $invokeParams['Credential'] = $credential
     }
     
     Write-Host "`nDisk I/O Performance:" -ForegroundColor Cyan

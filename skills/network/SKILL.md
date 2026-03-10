@@ -8,7 +8,8 @@ Analyze network configuration including IP addresses, DNS settings, open ports, 
 ### Complete Network Configuration Analysis
 ```powershell
 $ServerName = "TARGET_SERVER"
-$Credential = $null  # Set if needed
+# For current user (default): no credential needed
+# For explicit credentials: check if $credential variable exists (user must create BEFORE running gh copilot)
 
 $scriptBlock = {
     try {
@@ -77,8 +78,8 @@ try {
     SessionOption = (New-PSSessionOption -SkipCACheck -SkipCNCheck)
     }
     
-    if ($Credential) {
-        $invokeParams['Credential'] = $Credential
+    if ($credential) {
+        $invokeParams['Credential'] = $credential
     }
     
     Write-Host "`nAnalyzing network configuration on $ServerName..." -ForegroundColor Cyan
@@ -121,7 +122,8 @@ try {
 ### Test Network Connectivity (Ping, Port Tests)
 ```powershell
 $ServerName = "TARGET_SERVER"
-$Credential = $null
+# For current user (default): no credential needed
+# For explicit credentials: check if $credential variable exists (user must create BEFORE running gh copilot)
 $TargetHost = "8.8.8.8"  # Test target (e.g., DNS server, gateway, internet)
 $TargetPorts = @(80, 443, 3389, 445, 53)  # Ports to test
 
@@ -182,8 +184,8 @@ try {
     SessionOption = (New-PSSessionOption -SkipCACheck -SkipCNCheck)
     }
     
-    if ($Credential) {
-        $invokeParams['Credential'] = $Credential
+    if ($credential) {
+        $invokeParams['Credential'] = $credential
     }
     
     Write-Host "`nTesting connectivity from $ServerName to $TargetHost..." -ForegroundColor Cyan
@@ -217,7 +219,8 @@ try {
 ### Get Listening Ports and Connections
 ```powershell
 $ServerName = "TARGET_SERVER"
-$Credential = $null
+# For current user (default): no credential needed
+# For explicit credentials: check if $credential variable exists (user must create BEFORE running gh copilot)
 
 $scriptBlock = {
     try {
@@ -256,8 +259,8 @@ try {
     SessionOption = (New-PSSessionOption -SkipCACheck -SkipCNCheck)
     }
     
-    if ($Credential) {
-        $invokeParams['Credential'] = $Credential
+    if ($credential) {
+        $invokeParams['Credential'] = $credential
     }
     
     Write-Host "`nEnumerating network connections on $ServerName..." -ForegroundColor Cyan
@@ -283,7 +286,8 @@ try {
 ### Get Firewall Rules
 ```powershell
 $ServerName = "TARGET_SERVER"
-$Credential = $null
+# For current user (default): no credential needed
+# For explicit credentials: check if $credential variable exists (user must create BEFORE running gh copilot)
 $Direction = "Inbound"  # Inbound or Outbound
 
 $scriptBlock = {
@@ -328,8 +332,8 @@ try {
     SessionOption = (New-PSSessionOption -SkipCACheck -SkipCNCheck)
     }
     
-    if ($Credential) {
-        $invokeParams['Credential'] = $Credential
+    if ($credential) {
+        $invokeParams['Credential'] = $credential
     }
     
     Write-Host "`nRetrieving $Direction firewall rules from $ServerName..." -ForegroundColor Cyan
@@ -354,7 +358,8 @@ try {
 ### DNS Resolution Test
 ```powershell
 $ServerName = "TARGET_SERVER"
-$Credential = $null
+# For current user (default): no credential needed
+# For explicit credentials: check if $credential variable exists (user must create BEFORE running gh copilot)
 $HostnamesToResolve = @("google.com", "dc01.contoso.com", "fileserver01")  # Test hostnames
 
 $scriptBlock = {
@@ -397,8 +402,8 @@ try {
     SessionOption = (New-PSSessionOption -SkipCACheck -SkipCNCheck)
     }
     
-    if ($Credential) {
-        $invokeParams['Credential'] = $Credential
+    if ($credential) {
+        $invokeParams['Credential'] = $credential
     }
     
     Write-Host "`nTesting DNS resolution from $ServerName..." -ForegroundColor Cyan

@@ -8,7 +8,8 @@ Collect real-time and historical performance metrics including CPU usage, memory
 ### Comprehensive Performance Snapshot
 ```powershell
 $ServerName = "TARGET_SERVER"
-$Credential = $null  # Set if needed
+# For current user (default): no credential needed
+# For explicit credentials: check if $credential variable exists (user must create BEFORE running gh copilot)
 
 $scriptBlock = {
     try {
@@ -94,8 +95,8 @@ try {
     SessionOption = (New-PSSessionOption -SkipCACheck -SkipCNCheck)
     }
     
-    if ($Credential) {
-        $invokeParams['Credential'] = $Credential
+    if ($credential) {
+        $invokeParams['Credential'] = $credential
     }
     
     Write-Host "`nGathering performance metrics from $ServerName..." -ForegroundColor Cyan
@@ -146,7 +147,8 @@ try {
 ### Continuous Monitoring (Sample Over Time)
 ```powershell
 $ServerName = "TARGET_SERVER"
-$Credential = $null
+# For current user (default): no credential needed
+# For explicit credentials: check if $credential variable exists (user must create BEFORE running gh copilot)
 $SampleCount = 5
 $IntervalSeconds = 2
 
@@ -188,8 +190,8 @@ try {
     SessionOption = (New-PSSessionOption -SkipCACheck -SkipCNCheck)
     }
     
-    if ($Credential) {
-        $invokeParams['Credential'] = $Credential
+    if ($credential) {
+        $invokeParams['Credential'] = $credential
     }
     
     $samples = Invoke-Command @invokeParams
@@ -214,7 +216,8 @@ try {
 ### Detailed Counter Collection
 ```powershell
 $ServerName = "TARGET_SERVER"
-$Credential = $null
+# For current user (default): no credential needed
+# For explicit credentials: check if $credential variable exists (user must create BEFORE running gh copilot)
 
 # Define counters of interest
 $counters = @(

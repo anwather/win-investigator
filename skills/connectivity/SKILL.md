@@ -11,19 +11,34 @@ Test connectivity to a Windows Server and establish a PowerShell remoting sessio
 
 ## Credential Handling
 
-⚠️ **SECURITY: NEVER ask users to type passwords in the chat.** Use `Get-Credential` which opens 
-a secure Windows login dialog where passwords are never visible in the conversation.
+⚠️ **SECURITY: NEVER ask users to type passwords in the chat.** Passwords are visible in plain text and stored in chat history.
 
-**Default (current user):**
+**The user must create the `$credential` variable BEFORE running Copilot CLI** (or when prompted):
 ```powershell
-$Credential = $null  # Uses current user's identity automatically
+# User runs this in their PowerShell session:
+$credential = Get-Credential
 ```
 
-**Explicit credentials (secure dialog):**
+**Default (current user):**
+For domain-joined machines accessing domain servers, no `$credential` variable is needed. The current user's identity is used automatically.
+
+**Explicit credentials (pre-created variable):**
+When explicit credentials are required (Azure VMs, cross-domain, workgroup servers), the agent checks for the `$credential` variable:
 ```powershell
-# Opens a Windows GUI dialog for secure password entry
-$Credential = Get-Credential -UserName "domain\admin" -Message "Enter credentials for ServerName"
-# User enters password in the dialog, NOT in the chat
+# Agent checks if credential exists
+if (-not $credential) {
+    Write-Host "⚠️ I need credentials to connect to $ServerName." -ForegroundColor Yellow
+    Write-Host ""
+    Write-Host "Please run this in your PowerShell session:" -ForegroundColor Cyan
+    Write-Host "  `$credential = Get-Credential" -ForegroundColor White
+    Write-Host ""
+    Write-Host "Then ask me again and I'll connect using those credentials." -ForegroundColor Cyan
+    return
+}
+
+# Agent uses pre-created credential
+$SessionOption = New-PSSessionOption -SkipCACheck -SkipCNCheck
+$session = New-PSSession -ComputerName $ServerName -UseSSL -Port 5986 -Credential $credential -SessionOption $SessionOption
 ```
 
 ## Connection Pattern
@@ -73,10 +88,16 @@ try {
 ```powershell
 $ServerName = "TARGET_SERVER"  # Hostname or IP address
 
-# For explicit credentials, open secure dialog (NEVER type passwords in chat):
-# $Credential = Get-Credential -UserName "domain\admin" -Message "Enter credentials for $ServerName"
-# For current user (default):
-$Credential = $null
+# Check if explicit credentials needed
+if (-not $credential) {
+    Write-Host "⚠️ I need credentials to connect to $ServerName." -ForegroundColor Yellow
+    Write-Host ""
+    Write-Host "Please run this in your PowerShell session:" -ForegroundColor Cyan
+    Write-Host "  `$credential = Get-Credential" -ForegroundColor White
+    Write-Host ""
+    Write-Host "Then ask me again and I'll connect using those credentials." -ForegroundColor Cyan
+    return
+}
 
 $SessionOption = New-PSSessionOption -SkipCACheck -SkipCNCheck
 $splat = @{
@@ -86,7 +107,7 @@ $splat = @{
     SessionOption = $SessionOption
     ErrorAction   = 'Stop'
 }
-if ($Credential) { $splat['Credential'] = $Credential }
+if ($credential) { $splat['Credential'] = $credential }
 
 try {
     $session = New-PSSession @splat
@@ -112,7 +133,8 @@ try {
     Write-Warning "✗ Connection failed: $($_.Exception.Message)"
 
     if ($_.Exception.Message -match "Access is denied") {
-        Write-Host "  → Check credentials and permissions (use Get-Credential for explicit creds)" -ForegroundColor Yellow
+        Write-Host "  → Verify `$credential variable exists and is correct" -ForegroundColor Yellow
+        Write-Host "  → User can create new credential: `$credential = Get-Credential" -ForegroundColor Yellow
     } elseif ($_.Exception.Message -match "cannot be resolved") {
         Write-Host "  → Check DNS resolution and network connectivity" -ForegroundColor Yellow
     } elseif ($_.Exception.Message -match "certificate") {
@@ -127,10 +149,8 @@ try {
 ```powershell
 $ServerName = "TARGET_SERVER"
 
-# For explicit credentials, open secure dialog:
-# $Credential = Get-Credential -Message "Enter credentials for $ServerName"
-# For current user:
-$Credential = $null
+# For current user (default): no credential needed
+# For explicit credentials: check if $credential variable exists
 
 $SessionOption = New-PSSessionOption -SkipCACheck -SkipCNCheck
 $invokeParams = @{
@@ -148,7 +168,7 @@ $invokeParams = @{
         }
     }
 }
-if ($Credential) { $invokeParams['Credential'] = $Credential }
+if ($credential) { $invokeParams['Credential'] = $credential }
 
 try {
     $result = Invoke-Command @invokeParams
@@ -162,7 +182,8 @@ try {
 ### Create Reusable CIM Session
 ```powershell
 $ServerName = "TARGET_SERVER"
-$Credential = $null  # Set to Get-Credential result if needed
+
+# Check for $credential variable if explicit auth needed
 
 try {
     $CimOption = New-CimSessionOption -UseSsl -SkipCACheck -SkipCNCheck
@@ -172,7 +193,7 @@ try {
         Port          = 5986
         ErrorAction   = 'Stop'
     }
-    if ($Credential) { $cimSplat['Credential'] = $Credential }
+    if ($credential) { $cimSplat['Credential'] = $credential }
 
     $cimSession = New-CimSession @cimSplat
     Write-Host "✓ CIM session established to $ServerName over HTTPS" -ForegroundColor Green

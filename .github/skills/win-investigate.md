@@ -72,11 +72,19 @@ Present results as:
 
 ## Credential Flow
 
-- **Default:** Use current user credentials (no explicit credential object)
-- **Explicit:** If user needs alternate credentials, use Get-Credential to open secure Windows dialog:
+- **Default:** Use current user credentials (no explicit credential object needed)
+- **Explicit:** If user needs alternate credentials, check for pre-created `$credential` variable:
   ```powershell
-  $Credential = Get-Credential -UserName "domain\admin" -Message "Enter credentials for ServerName"
-  # User enters password in GUI dialog, NOT in chat
+  # Agent checks for variable (user must create BEFORE running gh copilot)
+  if (-not $credential) {
+      Write-Host "⚠️ I need credentials to connect to $ServerName." -ForegroundColor Yellow
+      Write-Host "Please run this in your PowerShell session:" -ForegroundColor Cyan
+      Write-Host "  `$credential = Get-Credential" -ForegroundColor White
+      Write-Host "Then ask me again and I'll connect using those credentials." -ForegroundColor Cyan
+      return
+  }
+  # Agent uses pre-created credential
+  $session = New-PSSession -ComputerName $ServerName -Credential $credential -ErrorAction Stop
   ```
 
 ## Skill Implementation Notes

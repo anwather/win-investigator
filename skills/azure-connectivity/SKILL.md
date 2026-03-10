@@ -23,12 +23,15 @@ Establish PowerShell remoting sessions to Azure VMs accessed via public IP addre
 
 ### On the Client Machine (your workstation)
 
-1. **Explicit credentials ready** — Kerberos does not work over public IP, so you'll use `Get-Credential` 
-   to open a secure Windows login dialog where the password is entered safely (NOT typed in chat)
+1. **Explicit credentials ready** — Kerberos does not work over public IP. User must create the 
+   `$credential` variable BEFORE running Copilot CLI (or when prompted by the agent):
+   ```powershell
+   $credential = Get-Credential
+   ```
 2. No TrustedHosts modification needed — `-SkipCACheck` and `-SkipCNCheck` handle certificate validation
 
-⚠️ **SECURITY: NEVER ask users to type Azure VM passwords in the chat.** Always use `Get-Credential` 
-which opens a secure GUI dialog.
+⚠️ **SECURITY: NEVER ask users to type Azure VM passwords in the chat.** The user creates the 
+`$credential` variable in their PowerShell session, where the secure Windows login dialog opens.
 
 ---
 
@@ -130,15 +133,27 @@ try {
 ```powershell
 $ServerName = "20.100.50.25"  # Azure VM public IP or hostname
 
-# Open secure credential dialog (NEVER type password in chat)
-$Credential = Get-Credential -Message "Enter credentials for Azure VM at $ServerName"
+# Check if $credential variable exists (must be created by user in their PowerShell session)
+if (-not $credential) {
+    Write-Host "⚠️ I need credentials to connect to Azure VM $ServerName." -ForegroundColor Yellow
+    Write-Host ""
+    Write-Host "Please run this in your PowerShell session:" -ForegroundColor Cyan
+    Write-Host "  `$credential = Get-Credential" -ForegroundColor White
+    Write-Host ""
+    Write-Host "Username formats for Azure VMs:" -ForegroundColor Gray
+    Write-Host "  • Local account: .\AdminUser  or  VMName\AdminUser" -ForegroundColor Gray
+    Write-Host "  • Azure AD account: user@domain.com" -ForegroundColor Gray
+    Write-Host ""
+    Write-Host "Then ask me again and I'll connect using those credentials." -ForegroundColor Cyan
+    return
+}
 
 $SessionOption = New-PSSessionOption -SkipCACheck -SkipCNCheck
 
 try {
     $session = New-PSSession `
         -ComputerName $ServerName `
-        -Credential $Credential `
+        -Credential $credential `
         -UseSSL `
         -Port 5986 `
         -SessionOption $SessionOption `
@@ -165,8 +180,9 @@ try {
     Write-Warning "✗ PSSession failed: $($_.Exception.Message)"
 
     if ($_.Exception.Message -match "Access is denied") {
-        Write-Host "  → Verify credentials in the Get-Credential dialog" -ForegroundColor Yellow
+        Write-Host "  → Verify `$credential variable is correct" -ForegroundColor Yellow
         Write-Host "  → Username format: VM_NAME\AdminUser or user@domain.com" -ForegroundColor Yellow
+        Write-Host "  → Create new credential: `$credential = Get-Credential" -ForegroundColor Yellow
     } elseif ($_.Exception.Message -match "cannot connect") {
         Write-Host "  → Check NSG, firewall, and WinRM HTTPS listener" -ForegroundColor Yellow
     } elseif ($_.Exception.Message -match "certificate") {

@@ -163,12 +163,22 @@ if ($tcpTest.TcpTestSucceeded) {
 # Test WinRM over HTTPS
 Test-WSMan -ComputerName $ServerName -UseSSL -ErrorAction Stop
 
-# Establish PSSession
-$Credential = $null  # For current user, or use Get-Credential for explicit creds
-$SessionOption = New-PSSessionOption -SkipCACheck -SkipCNCheck
-$session = New-PSSession -ComputerName $ServerName -UseSSL -Port 5986 -SessionOption $SessionOption -Credential $Credential -ErrorAction Stop
+# Check for $credential variable (for explicit auth)
+if (-not $credential) {
+    Write-Host "⚠️ I need credentials to connect to $ServerName." -ForegroundColor Yellow
+    Write-Host ""
+    Write-Host "Please run this in your PowerShell session:" -ForegroundColor Cyan
+    Write-Host "  `$credential = Get-Credential" -ForegroundColor White
+    Write-Host ""
+    Write-Host "Then ask me again and I'll connect using those credentials." -ForegroundColor Cyan
+    return
+}
 
-# One-shot Invoke-Command
+# Establish PSSession
+$SessionOption = New-PSSessionOption -SkipCACheck -SkipCNCheck
+$session = New-PSSession -ComputerName $ServerName -UseSSL -Port 5986 -SessionOption $SessionOption -Credential $credential -ErrorAction Stop
+
+# One-shot Invoke-Command (current user - no credential needed)
 $SessionOption = New-PSSessionOption -SkipCACheck -SkipCNCheck
 $invokeParams = @{
     ComputerName  = $ServerName
@@ -178,7 +188,8 @@ $invokeParams = @{
     ScriptBlock   = { Get-ComputerInfo | Select ComputerName, OsName, OsVersion }
     ErrorAction   = 'Stop'
 }
-if ($Credential) { $invokeParams['Credential'] = $Credential }
+# Only add Credential if variable exists (for explicit auth scenarios)
+if ($credential) { $invokeParams['Credential'] = $credential }
 $result = Invoke-Command @invokeParams
 ```
 
@@ -188,7 +199,8 @@ $result = Invoke-Command @invokeParams
 
 ```powershell
 $ServerName = "TARGET_SERVER"
-$Credential = $null
+# If explicit credentials needed, check for $credential variable
+# For current user (default), proceed without credential
 $scriptBlock = {
     $os = Get-CimInstance -ClassName Win32_OperatingSystem
     $cs = Get-CimInstance -ClassName Win32_ComputerSystem
@@ -212,7 +224,7 @@ $invokeParams = @{
     SessionOption = (New-PSSessionOption -SkipCACheck -SkipCNCheck)
     ErrorAction   = 'Stop'
 }
-if ($Credential) { $invokeParams['Credential'] = $Credential }
+if ($credential) { $invokeParams['Credential'] = $credential }
 $result = Invoke-Command @invokeParams
 ```
 
@@ -222,7 +234,6 @@ $result = Invoke-Command @invokeParams
 
 ```powershell
 $ServerName = "TARGET_SERVER"
-$Credential = $null
 $scriptBlock = {
     $processes = Get-CimInstance -ClassName Win32_Process
     $processData = $processes | ForEach-Object {
@@ -249,7 +260,7 @@ $invokeParams = @{
     SessionOption = (New-PSSessionOption -SkipCACheck -SkipCNCheck)
     ErrorAction   = 'Stop'
 }
-if ($Credential) { $invokeParams['Credential'] = $Credential }
+if ($credential) { $invokeParams['Credential'] = $credential }
 $result = Invoke-Command @invokeParams
 ```
 
@@ -259,7 +270,6 @@ $result = Invoke-Command @invokeParams
 
 ```powershell
 $ServerName = "TARGET_SERVER"
-$Credential = $null
 $scriptBlock = {
     $cpuCounter = Get-Counter '\Processor(_Total)\% Processor Time'
     $cpuAvg = [math]::Round($cpuCounter.CounterSamples[0].CookedValue, 2)
@@ -285,7 +295,7 @@ $invokeParams = @{
     SessionOption = (New-PSSessionOption -SkipCACheck -SkipCNCheck)
     ErrorAction   = 'Stop'
 }
-if ($Credential) { $invokeParams['Credential'] = $Credential }
+if ($credential) { $invokeParams['Credential'] = $credential }
 $result = Invoke-Command @invokeParams
 ```
 
@@ -295,7 +305,6 @@ $result = Invoke-Command @invokeParams
 
 ```powershell
 $ServerName = "TARGET_SERVER"
-$Credential = $null
 $scriptBlock = {
     $volumes = Get-Volume | Where-Object { $_.DriveLetter }
     $volumeData = $volumes | ForEach-Object {
@@ -321,7 +330,7 @@ $invokeParams = @{
     SessionOption = (New-PSSessionOption -SkipCACheck -SkipCNCheck)
     ErrorAction   = 'Stop'
 }
-if ($Credential) { $invokeParams['Credential'] = $Credential }
+if ($credential) { $invokeParams['Credential'] = $credential }
 $result = Invoke-Command @invokeParams
 ```
 
@@ -331,7 +340,6 @@ $result = Invoke-Command @invokeParams
 
 ```powershell
 $ServerName = "TARGET_SERVER"
-$Credential = $null
 $scriptBlock = {
     $services = Get-CimInstance -ClassName Win32_Service
     $shouldBeRunning = $services | Where-Object { $_.StartMode -eq "Auto" -and $_.State -ne "Running" }
@@ -350,7 +358,7 @@ $invokeParams = @{
     SessionOption = (New-PSSessionOption -SkipCACheck -SkipCNCheck)
     ErrorAction   = 'Stop'
 }
-if ($Credential) { $invokeParams['Credential'] = $Credential }
+if ($credential) { $invokeParams['Credential'] = $credential }
 $result = Invoke-Command @invokeParams
 ```
 
@@ -360,7 +368,6 @@ $result = Invoke-Command @invokeParams
 
 ```powershell
 $ServerName = "TARGET_SERVER"
-$Credential = $null
 $scriptBlock = {
     $adapters = Get-NetAdapter | Where-Object { $_.Status -ne "Disabled" }
     $adapterInfo = $adapters | ForEach-Object {
@@ -385,7 +392,7 @@ $invokeParams = @{
     SessionOption = (New-PSSessionOption -SkipCACheck -SkipCNCheck)
     ErrorAction   = 'Stop'
 }
-if ($Credential) { $invokeParams['Credential'] = $Credential }
+if ($credential) { $invokeParams['Credential'] = $credential }
 $result = Invoke-Command @invokeParams
 ```
 
@@ -395,7 +402,6 @@ $result = Invoke-Command @invokeParams
 
 ```powershell
 $ServerName = "TARGET_SERVER"
-$Credential = $null
 $DaysBack = 7
 $scriptBlock = {
     param($days)
@@ -430,7 +436,7 @@ $invokeParams = @{
     SessionOption = (New-PSSessionOption -SkipCACheck -SkipCNCheck)
     ErrorAction   = 'Stop'
 }
-if ($Credential) { $invokeParams['Credential'] = $Credential }
+if ($credential) { $invokeParams['Credential'] = $credential }
 $result = Invoke-Command @invokeParams
 ```
 
@@ -456,10 +462,24 @@ New-NetFirewallRule -DisplayName "WinRM HTTPS" -Direction Inbound -Protocol TCP 
 $ServerName = "20.100.50.25"  # Azure public IP
 Test-NetConnection -ComputerName $ServerName -Port 5986
 
-# Step 4: Establish session with explicit credentials
-$Credential = Get-Credential -Message "Enter Azure VM credentials for $ServerName"
+# Step 4: Check for $credential variable
+if (-not $credential) {
+    Write-Host "⚠️ I need credentials to connect to Azure VM $ServerName." -ForegroundColor Yellow
+    Write-Host ""
+    Write-Host "Please run this in your PowerShell session:" -ForegroundColor Cyan
+    Write-Host "  `$credential = Get-Credential" -ForegroundColor White
+    Write-Host ""
+    Write-Host "Username formats for Azure VMs:" -ForegroundColor Gray
+    Write-Host "  • Local account: .\AdminUser  or  VMName\AdminUser" -ForegroundColor Gray
+    Write-Host "  • Azure AD account: user@domain.com" -ForegroundColor Gray
+    Write-Host ""
+    Write-Host "Then ask me again and I'll connect using those credentials." -ForegroundColor Cyan
+    return
+}
+
+# Step 5: Establish session with pre-created credential
 $SessionOption = New-PSSessionOption -SkipCACheck -SkipCNCheck
-$session = New-PSSession -ComputerName $ServerName -Credential $Credential -UseSSL -Port 5986 -SessionOption $SessionOption
+$session = New-PSSession -ComputerName $ServerName -Credential $credential -UseSSL -Port 5986 -SessionOption $SessionOption
 ```
 
 **Username formats for Azure VMs:**
@@ -481,86 +501,107 @@ conversation are visible in plain text and stored in chat history. This is a cri
 
 ### How Credentials Work
 
-When the user needs to provide credentials (e.g., for Azure VMs or cross-domain servers):
+Copilot CLI cannot reliably pop up GUI dialogs. Users must create credentials BEFORE starting 
+Copilot CLI (or in a separate PowerShell window).
 
-1. Run `Get-Credential` — this opens a **secure Windows login dialog**
-2. The user enters their username and password in the dialog (NOT in the chat)
-3. The dialog returns a PSCredential object that you use in commands
-4. The password is never visible in the conversation
+**The user creates a credential variable in their PowerShell session:**
+```powershell
+# User runs this BEFORE starting Copilot CLI (or when prompted):
+$credential = Get-Credential
+```
 
-### Default: Current User (No Prompt)
+**The agent checks for the variable and uses it:**
+```powershell
+# Agent checks if credential exists
+if (-not $credential) {
+    # Tell user how to create it
+}
+
+# Agent uses it in remoting commands
+$SessionOption = New-PSSessionOption -SkipCACheck -SkipCNCheck
+$session = New-PSSession -ComputerName ServerName -UseSSL -Port 5986 -Credential $credential -SessionOption $SessionOption
+```
+
+### Default: Current User (No Credential Needed)
 
 For domain-joined machines accessing domain servers, no credentials are needed.
 The current user's identity is used automatically via implicit credentials.
 
 ```
 User: "Check server01"
-→ Connect using current user identity (no prompting, just works)
+→ Connect using current user identity (no $credential variable needed)
 ```
 
-### Explicit Credentials (GUI Dialog)
+### Explicit Credentials: Pre-Created Variable
 
-When the user says "use admin credentials" or "connect as domain\admin", run Get-Credential 
-to open a secure Windows login dialog:
+When the user needs explicit credentials (Azure VMs, cross-domain, workgroup servers):
 
+**STEP 1: Check if $credential exists**
 ```powershell
-# Open secure credential dialog
-$cred = Get-Credential -UserName "domain\admin" -Message "Enter credentials for ServerName"
-
-# Use in remoting commands
-$SessionOption = New-PSSessionOption -SkipCACheck -SkipCNCheck
-$session = New-PSSession -ComputerName ServerName -UseSSL -Port 5986 -Credential $cred -SessionOption $SessionOption
-```
-
-**Credential Flow (the correct pattern):**
-```
-1. User says: "check server01 with admin credentials"
-2. Agent runs: $cred = Get-Credential -Message "Enter credentials for server01"
-3. Windows shows a secure login dialog (GUI popup)
-4. User enters username/password in the dialog window
-5. Agent uses $cred in -Credential parameter
-6. Password never appears in conversation
-```
-
-### Azure VM Credentials (Always Required)
-
-Azure VMs over public IP **always need explicit credentials** — Kerberos does not work over the public internet:
-
-```powershell
-# Always prompt for creds when connecting to Azure VMs
-$cred = Get-Credential -Message "Enter Azure VM credentials for 20.30.40.50"
-
-$SessionOption = New-PSSessionOption -SkipCACheck -SkipCNCheck
-$session = New-PSSession -ComputerName "20.30.40.50" -UseSSL -Port 5986 -Credential $cred -SessionOption $SessionOption
-```
-
-**Username formats for Azure VMs:**
-- Local account: `.\AdminUser` or `VMName\AdminUser`
-- Azure AD account: `user@domain.com`
-
-See the **azure-connectivity** skill for Azure-specific setup (NSG rules, WinRM listener, alternatives).
-
-### Pre-stored Credentials (Windows Credential Manager)
-
-For frequently accessed servers, users can store credentials once (they do this themselves, outside of Copilot):
-
-```powershell
-# User runs this one-time setup (not in Copilot chat):
-Install-Module -Name CredentialManager -Force
-New-StoredCredential -Target "server01" -UserName "domain\admin" -SecurePassword (Read-Host -AsSecureString "Password")
-
-# Agent retrieves stored credentials (no prompt needed):
-$cred = Get-StoredCredential -Target "server01"
-if ($cred) {
-    # Use $cred in remoting commands
-} else {
-    # Credential not found, fall back to Get-Credential
-    $cred = Get-Credential -Message "Enter credentials for server01"
+if (-not $credential) {
+    Write-Host "⚠️ I need credentials to connect to $ServerName." -ForegroundColor Yellow
+    Write-Host ""
+    Write-Host "Please run this in your PowerShell session:" -ForegroundColor Cyan
+    Write-Host "  `$credential = Get-Credential" -ForegroundColor White
+    Write-Host ""
+    Write-Host "Then ask me again and I'll connect using those credentials." -ForegroundColor Cyan
+    return
 }
 ```
 
+**STEP 2: Use $credential in connection commands**
+```powershell
+$SessionOption = New-PSSessionOption -SkipCACheck -SkipCNCheck
+$session = New-PSSession -ComputerName $ServerName -UseSSL -Port 5986 -Credential $credential -SessionOption $SessionOption
+```
+
+**Message template when $credential is missing:**
+```
+⚠️ I need credentials to connect to {ServerName}.
+
+Please run this in your PowerShell session:
+  $credential = Get-Credential
+
+Then ask me again and I'll connect using those credentials.
+```
+
+**Why this approach:**
+- Copilot CLI runs in non-interactive mode and can't pop up dialogs reliably
+- Users run `Get-Credential` in their PowerShell session (outside Copilot CLI)
+- The secure Windows dialog appears in their PowerShell window
+- The `$credential` variable stays in their session
+- The agent uses the pre-created `$credential` variable when connecting
+
+### Azure VM Credentials (Always Required)
+
+Azure VMs over public IP **always need explicit credentials** — Kerberos does not work over the public internet.
+
+**Check for $credential before connecting:**
+```powershell
+if (-not $credential) {
+    Write-Host "⚠️ I need credentials to connect to Azure VM $ServerName." -ForegroundColor Yellow
+    Write-Host ""
+    Write-Host "Please run this in your PowerShell session:" -ForegroundColor Cyan
+    Write-Host "  `$credential = Get-Credential" -ForegroundColor White
+    Write-Host ""
+    Write-Host "Username formats for Azure VMs:" -ForegroundColor Gray
+    Write-Host "  • Local account: .\AdminUser  or  VMName\AdminUser" -ForegroundColor Gray
+    Write-Host "  • Azure AD account: user@domain.com" -ForegroundColor Gray
+    Write-Host ""
+    Write-Host "Then ask me again and I'll connect using those credentials." -ForegroundColor Cyan
+    return
+}
+
+# Use pre-created credential
+$SessionOption = New-PSSessionOption -SkipCACheck -SkipCNCheck
+$session = New-PSSession -ComputerName $ServerName -UseSSL -Port 5986 -Credential $credential -SessionOption $SessionOption
+```
+
+See the **azure-connectivity** skill for Azure-specific setup (NSG rules, WinRM listener, alternatives).
+
 ### ❌ NEVER Do These
 
+- **Never** run `Get-Credential` yourself — the GUI dialog won't work reliably in Copilot CLI
 - **Never** ask "what is your password?" in the chat
 - **Never** construct: `ConvertTo-SecureString "PlainTextPassword" -AsPlainText -Force`
 - **Never** display or log credential objects (they contain passwords)
@@ -576,18 +617,19 @@ if ($cred) {
    → Check hostname/IP is correct — IP addresses are supported directly
 
 ❌ Access denied
-   → Verify credentials are correct (username/password in the Get-Credential dialog)
+   → Verify $credential variable exists and is correct
+   → User can create new credential: $credential = Get-Credential
    → Check user has admin rights on target server
    → Check user is in Administrators group on target
+
+❌ $credential variable not found
+   → Tell user to run: $credential = Get-Credential in their PowerShell session
+   → Then ask them to resume the request
+   → Never try to run Get-Credential yourself
 
 ❌ WinRM not responding
    → Target may be offline or WinRM service stopped
    → Ask user to verify server is online and responsive
-
-❌ Get-Credential dialog doesn't appear
-   → May need to focus the PowerShell window
-   → On some systems, the dialog appears behind other windows
-   → Check the taskbar for a blinking PowerShell or credential prompt window
 
 ❌ Azure VM — NSG blocking port 5986
    → Connection timeouts to Azure public IPs usually mean NSG has no inbound rule for TCP 5986
@@ -599,7 +641,7 @@ if ($cred) {
    → If cert is expired, regenerate on the VM and rebind to WinRM listener
 
 ❌ Azure VM — Connection refused
-   → Ensure explicit credentials are provided (no implicit auth over internet)
+   → Ensure $credential variable exists (no implicit auth over internet)
    → The -SkipCACheck and -SkipCNCheck flags handle certificate validation for IP addresses
 ```
 

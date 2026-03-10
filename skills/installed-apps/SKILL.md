@@ -8,7 +8,8 @@ Get a list of installed applications, recent installations/updates, software ver
 ### Complete Installed Applications Inventory
 ```powershell
 $ServerName = "TARGET_SERVER"
-$Credential = $null  # Set if needed
+# For current user (default): no credential needed
+# For explicit credentials: check if $credential variable exists (user must create BEFORE running gh copilot)
 
 $scriptBlock = {
     try {
@@ -76,8 +77,8 @@ try {
     SessionOption = (New-PSSessionOption -SkipCACheck -SkipCNCheck)
     }
     
-    if ($Credential) {
-        $invokeParams['Credential'] = $Credential
+    if ($credential) {
+        $invokeParams['Credential'] = $credential
     }
     
     Write-Host "`nInventorying installed applications on $ServerName..." -ForegroundColor Cyan
@@ -149,7 +150,8 @@ try {
 ### Get Windows Updates / Hotfixes
 ```powershell
 $ServerName = "TARGET_SERVER"
-$Credential = $null
+# For current user (default): no credential needed
+# For explicit credentials: check if $credential variable exists (user must create BEFORE running gh copilot)
 $DaysBack = 30
 
 $scriptBlock = {
@@ -186,8 +188,8 @@ try {
     SessionOption = (New-PSSessionOption -SkipCACheck -SkipCNCheck)
     }
     
-    if ($Credential) {
-        $invokeParams['Credential'] = $Credential
+    if ($credential) {
+        $invokeParams['Credential'] = $credential
     }
     
     Write-Host "`nRetrieving Windows Updates/Hotfixes from $ServerName..." -ForegroundColor Cyan
@@ -220,7 +222,8 @@ try {
 ### Get Windows Features (Server Roles/Features)
 ```powershell
 $ServerName = "TARGET_SERVER"
-$Credential = $null
+# For current user (default): no credential needed
+# For explicit credentials: check if $credential variable exists (user must create BEFORE running gh copilot)
 
 $scriptBlock = {
     try {
@@ -259,8 +262,8 @@ try {
     SessionOption = (New-PSSessionOption -SkipCACheck -SkipCNCheck)
     }
     
-    if ($Credential) {
-        $invokeParams['Credential'] = $Credential
+    if ($credential) {
+        $invokeParams['Credential'] = $credential
     }
     
     Write-Host "`nRetrieving Windows Features from $ServerName..." -ForegroundColor Cyan
@@ -297,7 +300,8 @@ try {
 ### Get Software from Win32_Product (Alternative Method)
 ```powershell
 $ServerName = "TARGET_SERVER"
-$Credential = $null
+# For current user (default): no credential needed
+# For explicit credentials: check if $credential variable exists (user must create BEFORE running gh copilot)
 
 Write-Host "Querying Win32_Product (this may take several minutes)..." -ForegroundColor Yellow
 
@@ -325,8 +329,8 @@ try {
     SessionOption = (New-PSSessionOption -SkipCACheck -SkipCNCheck)
     }
     
-    if ($Credential) {
-        $invokeParams['Credential'] = $Credential
+    if ($credential) {
+        $invokeParams['Credential'] = $credential
     }
     
     $products = Invoke-Command @invokeParams

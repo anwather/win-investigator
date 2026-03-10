@@ -8,7 +8,8 @@ Analyze Windows services including status, startup type, failed services, servic
 ### Complete Service Analysis
 ```powershell
 $ServerName = "TARGET_SERVER"
-$Credential = $null  # Set if needed
+# For current user (default): no credential needed
+# For explicit credentials: check if $credential variable exists (user must create BEFORE running gh copilot)
 
 $scriptBlock = {
     try {
@@ -60,8 +61,8 @@ try {
     SessionOption = (New-PSSessionOption -SkipCACheck -SkipCNCheck)
     }
     
-    if ($Credential) {
-        $invokeParams['Credential'] = $Credential
+    if ($credential) {
+        $invokeParams['Credential'] = $credential
     }
     
     Write-Host "`nAnalyzing services on $ServerName..." -ForegroundColor Cyan
@@ -105,7 +106,8 @@ try {
 ### Check for Recent Service Crashes
 ```powershell
 $ServerName = "TARGET_SERVER"
-$Credential = $null
+# For current user (default): no credential needed
+# For explicit credentials: check if $credential variable exists (user must create BEFORE running gh copilot)
 $DaysBack = 7
 
 $scriptBlock = {
@@ -154,8 +156,8 @@ try {
     SessionOption = (New-PSSessionOption -SkipCACheck -SkipCNCheck)
     }
     
-    if ($Credential) {
-        $invokeParams['Credential'] = $Credential
+    if ($credential) {
+        $invokeParams['Credential'] = $credential
     }
     
     Write-Host "`nChecking for service crashes in last $DaysBack days..." -ForegroundColor Cyan
@@ -185,7 +187,8 @@ try {
 ### Get Service Dependencies
 ```powershell
 $ServerName = "TARGET_SERVER"
-$Credential = $null
+# For current user (default): no credential needed
+# For explicit credentials: check if $credential variable exists (user must create BEFORE running gh copilot)
 $ServiceName = "W3SVC"  # Example: IIS service
 
 $scriptBlock = {
@@ -227,8 +230,8 @@ try {
     SessionOption = (New-PSSessionOption -SkipCACheck -SkipCNCheck)
     }
     
-    if ($Credential) {
-        $invokeParams['Credential'] = $Credential
+    if ($credential) {
+        $invokeParams['Credential'] = $credential
     }
     
     $svcInfo = Invoke-Command @invokeParams
@@ -265,7 +268,8 @@ try {
 ### Start/Stop/Restart Service (Management)
 ```powershell
 $ServerName = "TARGET_SERVER"
-$Credential = $null
+# For current user (default): no credential needed
+# For explicit credentials: check if $credential variable exists (user must create BEFORE running gh copilot)
 $ServiceName = "Spooler"  # Example service
 $Action = "Restart"  # Start, Stop, Restart
 
@@ -329,8 +333,8 @@ try {
     SessionOption = (New-PSSessionOption -SkipCACheck -SkipCNCheck)
     }
     
-    if ($Credential) {
-        $invokeParams['Credential'] = $Credential
+    if ($credential) {
+        $invokeParams['Credential'] = $credential
     }
     
     $result = Invoke-Command @invokeParams

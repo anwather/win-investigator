@@ -8,7 +8,8 @@ Inventory installed Windows Server roles, role services, and features to underst
 ### Complete Roles and Features Inventory
 ```powershell
 $ServerName = "TARGET_SERVER"
-$Credential = $null  # Set if needed
+# For current user (default): no credential needed
+# For explicit credentials: check if $credential variable exists (user must create BEFORE running gh copilot)
 
 $scriptBlock = {
     try {
@@ -67,8 +68,8 @@ try {
     SessionOption = (New-PSSessionOption -SkipCACheck -SkipCNCheck)
     }
     
-    if ($Credential) {
-        $invokeParams['Credential'] = $Credential
+    if ($credential) {
+        $invokeParams['Credential'] = $credential
     }
     
     Write-Host "`nInventorying Windows Server Roles and Features on $ServerName..." -ForegroundColor Cyan
@@ -115,7 +116,8 @@ try {
 ### Check for Specific Role or Feature
 ```powershell
 $ServerName = "TARGET_SERVER"
-$Credential = $null
+# For current user (default): no credential needed
+# For explicit credentials: check if $credential variable exists (user must create BEFORE running gh copilot)
 $FeatureName = "Web-Server"  # e.g., "Web-Server", "AD-Domain-Services", "RSAT-AD-Tools"
 
 $scriptBlock = {
@@ -151,8 +153,8 @@ try {
     SessionOption = (New-PSSessionOption -SkipCACheck -SkipCNCheck)
     }
     
-    if ($Credential) {
-        $invokeParams['Credential'] = $Credential
+    if ($credential) {
+        $invokeParams['Credential'] = $credential
     }
     
     Write-Host "`nChecking for feature '$FeatureName' on $ServerName..." -ForegroundColor Cyan
@@ -175,7 +177,8 @@ try {
 ### Get Role-Specific Configuration (IIS Example)
 ```powershell
 $ServerName = "TARGET_SERVER"
-$Credential = $null
+# For current user (default): no credential needed
+# For explicit credentials: check if $credential variable exists (user must create BEFORE running gh copilot)
 
 $scriptBlock = {
     try {
@@ -240,8 +243,8 @@ try {
     SessionOption = (New-PSSessionOption -SkipCACheck -SkipCNCheck)
     }
     
-    if ($Credential) {
-        $invokeParams['Credential'] = $Credential
+    if ($credential) {
+        $invokeParams['Credential'] = $credential
     }
     
     Write-Host "`nAnalyzing IIS configuration on $ServerName..." -ForegroundColor Cyan
@@ -270,7 +273,8 @@ try {
 ### Get Active Directory Domain Services Configuration
 ```powershell
 $ServerName = "TARGET_SERVER"
-$Credential = $null
+# For current user (default): no credential needed
+# For explicit credentials: check if $credential variable exists (user must create BEFORE running gh copilot)
 
 $scriptBlock = {
     try {
@@ -332,8 +336,8 @@ try {
     SessionOption = (New-PSSessionOption -SkipCACheck -SkipCNCheck)
     }
     
-    if ($Credential) {
-        $invokeParams['Credential'] = $Credential
+    if ($credential) {
+        $invokeParams['Credential'] = $credential
     }
     
     Write-Host "`nAnalyzing Active Directory configuration on $ServerName..." -ForegroundColor Cyan

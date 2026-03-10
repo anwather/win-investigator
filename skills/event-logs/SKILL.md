@@ -8,7 +8,8 @@ Analyze Windows Event Logs to identify critical errors, warnings, and patterns t
 ### Get Recent Critical and Error Events
 ```powershell
 $ServerName = "TARGET_SERVER"
-$Credential = $null  # Set if needed
+# For current user (default): no credential needed
+# For explicit credentials: check if $credential variable exists (user must create BEFORE running gh copilot)
 $DaysBack = 7
 $MaxEvents = 50
 
@@ -78,8 +79,8 @@ try {
     SessionOption = (New-PSSessionOption -SkipCACheck -SkipCNCheck)
     }
     
-    if ($Credential) {
-        $invokeParams['Credential'] = $Credential
+    if ($credential) {
+        $invokeParams['Credential'] = $credential
     }
     
     Write-Host "`nAnalyzing event logs on $ServerName (last $DaysBack days)..." -ForegroundColor Cyan
@@ -113,7 +114,8 @@ try {
 ### Check for Specific Event IDs
 ```powershell
 $ServerName = "TARGET_SERVER"
-$Credential = $null
+# For current user (default): no credential needed
+# For explicit credentials: check if $credential variable exists (user must create BEFORE running gh copilot)
 $EventIds = @(1074, 1076, 6008)  # System shutdown events and unexpected reboots
 $DaysBack = 30
 
@@ -157,8 +159,8 @@ try {
     SessionOption = (New-PSSessionOption -SkipCACheck -SkipCNCheck)
     }
     
-    if ($Credential) {
-        $invokeParams['Credential'] = $Credential
+    if ($credential) {
+        $invokeParams['Credential'] = $credential
     }
     
     Write-Host "`nSearching for Event IDs: $($EventIds -join ', ') on $ServerName..." -ForegroundColor Cyan
@@ -189,7 +191,8 @@ try {
 ### Analyze System Crashes and Reboots
 ```powershell
 $ServerName = "TARGET_SERVER"
-$Credential = $null
+# For current user (default): no credential needed
+# For explicit credentials: check if $credential variable exists (user must create BEFORE running gh copilot)
 $DaysBack = 30
 
 $scriptBlock = {
@@ -266,8 +269,8 @@ try {
     SessionOption = (New-PSSessionOption -SkipCACheck -SkipCNCheck)
     }
     
-    if ($Credential) {
-        $invokeParams['Credential'] = $Credential
+    if ($credential) {
+        $invokeParams['Credential'] = $credential
     }
     
     Write-Host "`nAnalyzing system crashes and reboots on $ServerName (last $DaysBack days)..." -ForegroundColor Cyan
@@ -303,7 +306,8 @@ try {
 ### Get Events by Source/Provider
 ```powershell
 $ServerName = "TARGET_SERVER"
-$Credential = $null
+# For current user (default): no credential needed
+# For explicit credentials: check if $credential variable exists (user must create BEFORE running gh copilot)
 $ProviderName = "Microsoft-Windows-DistributedCOM"  # Example: DCOM errors
 $DaysBack = 7
 $MaxEvents = 30
@@ -344,8 +348,8 @@ try {
     SessionOption = (New-PSSessionOption -SkipCACheck -SkipCNCheck)
     }
     
-    if ($Credential) {
-        $invokeParams['Credential'] = $Credential
+    if ($credential) {
+        $invokeParams['Credential'] = $credential
     }
     
     Write-Host "`nRetrieving events from provider '$ProviderName'..." -ForegroundColor Cyan
@@ -364,7 +368,9 @@ try {
 ### Get Security Log Events (if accessible)
 ```powershell
 $ServerName = "TARGET_SERVER"
-$Credential = $null  # Usually requires elevated privileges
+# For current user (default): no credential needed
+# For explicit credentials: check if $credential variable exists (user must create BEFORE running gh copilot)
+# Usually requires elevated privileges
 $DaysBack = 1
 $MaxEvents = 100
 
@@ -427,8 +433,8 @@ try {
     SessionOption = (New-PSSessionOption -SkipCACheck -SkipCNCheck)
     }
     
-    if ($Credential) {
-        $invokeParams['Credential'] = $Credential
+    if ($credential) {
+        $invokeParams['Credential'] = $credential
     }
     
     Write-Host "`nRetrieving security events from $ServerName (last $DaysBack day(s))..." -ForegroundColor Cyan

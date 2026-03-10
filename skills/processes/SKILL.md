@@ -8,7 +8,8 @@ Analyze running processes on a Windows Server, identifying top CPU and memory co
 ### Complete Process Analysis
 ```powershell
 $ServerName = "TARGET_SERVER"
-$Credential = $null  # Set if needed
+# For current user (default): no credential needed
+# For explicit credentials: check if $credential variable exists (user must create BEFORE running gh copilot)
 
 $scriptBlock = {
     try {
@@ -118,7 +119,8 @@ try {
 ### Detect Hung/Not Responding Processes
 ```powershell
 $ServerName = "TARGET_SERVER"
-$Credential = $null
+# For current user (default): no credential needed
+# For explicit credentials: check if $credential variable exists (user must create BEFORE running gh copilot)
 
 $scriptBlock = {
     $hungProcesses = @()
@@ -157,8 +159,8 @@ try {
     SessionOption = (New-PSSessionOption -SkipCACheck -SkipCNCheck)
     }
     
-    if ($Credential) {
-        $invokeParams['Credential'] = $Credential
+    if ($credential) {
+        $invokeParams['Credential'] = $credential
     }
     
     $hungProcs = Invoke-Command @invokeParams
@@ -214,7 +216,8 @@ try {
 ### Get Process Tree (Parent-Child Relationships)
 ```powershell
 $ServerName = "TARGET_SERVER"
-$Credential = $null
+# For current user (default): no credential needed
+# For explicit credentials: check if $credential variable exists (user must create BEFORE running gh copilot)
 
 $scriptBlock = {
     $allProcs = Get-CimInstance Win32_Process
@@ -244,7 +247,7 @@ $scriptBlock = {
 }
 
 try {
-    Invoke-Command -ComputerName $ServerName -Credential $Credential -UseSSL -Port 5986 -SessionOption (New-PSSessionOption -SkipCACheck -SkipCNCheck) -ScriptBlock $scriptBlock -ErrorAction Stop
+    Invoke-Command -ComputerName $ServerName -Credential $credential -UseSSL -Port 5986 -SessionOption (New-PSSessionOption -SkipCACheck -SkipCNCheck) -ScriptBlock $scriptBlock -ErrorAction Stop
 } catch {
     Write-Error "Failed to get process tree: $($_.Exception.Message)"
 }

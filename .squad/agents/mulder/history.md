@@ -229,3 +229,77 @@ if ($Credential) { $params['Credential'] = $Credential }
 
 **Outcome:** SUCCESS. When users clone the repo and run `gh copilot`, all diagnostic skills are immediately available in the agent's context. No manual installation, no extra steps, no path configuration. Just works.
 
+---
+
+### Pre-Created $credential Variable Pattern Implemented (2026-03-10)
+
+**Context:** Copilot CLI runs in non-interactive mode and can't reliably pop up GUI dialogs. The previous approach of running `Get-Credential` inline doesn't work well in Copilot CLI.
+
+**Solution Implemented:** Users create a `$credential` variable BEFORE running Copilot CLI (or when prompted).
+
+**User Workflow:**
+1. User opens PowerShell terminal
+2. User runs: `$credential = Get-Credential` 
+3. Secure Windows dialog appears in PowerShell window
+4. User enters username/password in dialog
+5. User starts/resumes `gh copilot`
+6. Agent detects and uses the pre-created `$credential` variable
+
+**Agent Pattern:**
+```powershell
+# Agent checks for $credential variable
+if (-not $credential) {
+    Write-Host "⚠️ I need credentials to connect to $ServerName."
+    Write-Host "Please run this in your PowerShell session:"
+    Write-Host "  `$credential = Get-Credential"
+    Write-Host "Then ask me again and I'll connect using those credentials."
+    return
+}
+
+# Agent uses pre-created credential
+$SessionOption = New-PSSessionOption -SkipCACheck -SkipCNCheck
+$session = New-PSSession -ComputerName $ServerName -UseSSL -Port 5986 -Credential $credential -SessionOption $SessionOption
+```
+
+**Files Updated (11 total):**
+
+**Core Instructions:**
+1. `.github/copilot-instructions.md` — Complete rewrite of "Credential Handling" section + all embedded diagnostic skill code updated
+2. `.github/agents/win-investigator.md` — Updated explicit credentials section
+3. `.github/skills/win-investigate.md` — Updated credential flow pattern
+
+**Skills:**
+4. `skills/connectivity/SKILL.md` — Updated all credential handling patterns, credential check logic
+5. `skills/azure-connectivity/SKILL.md` — Updated Azure VM credential checks with username format guidance
+
+**Documentation:**
+6. `README.md` — Updated credentials section, removed Windows Credential Manager approach
+7. `docs/getting-started.md` — Complete rewrite of "Setting Up Credentials" section
+8. `docs/usage.md` — Updated "Credentials: Default vs. Explicit" section
+9. `docs/troubleshooting.md` — Removed "dialog doesn't appear", added "$credential variable not found"
+10. `docs/architecture.md` — Updated credential flow diagram and security principles
+
+**Decision:**
+11. `.squad/decisions/inbox/mulder-precreated-credential.md` — Full decision document created
+
+**Key Principles:**
+- NEVER run Get-Credential inline — agent never runs this command
+- Check for variable first: `if (-not $credential) { ... tell user ... }`
+- Guide users clearly — show exact command to run
+- Default (current user) still works — only add credential parameter when variable exists
+- Passwords never in chat — user creates credential outside Copilot CLI
+
+**Message Template:**
+```
+⚠️ I need credentials to connect to {ServerName}.
+
+Please run this in your PowerShell session:
+  $credential = Get-Credential
+
+Then ask me again and I'll connect using those credentials.
+```
+
+**Outcome:** SUCCESS. All files updated to use pre-created `$credential` variable pattern. Agents now check for the variable and guide users to create it in their PowerShell session. Pattern is consistent across all instructions, skills, and documentation. Credentials are secure (never in chat), reliable (works in Copilot CLI environment), and simple (one command for users).
+
+---
+
