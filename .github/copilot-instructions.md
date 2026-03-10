@@ -163,22 +163,39 @@ if ($tcpTest.TcpTestSucceeded) {
 # Test WinRM over HTTPS
 Test-WSMan -ComputerName $ServerName -UseSSL -ErrorAction Stop
 
-# Check for $credential variable (for explicit auth)
-if (-not $credential) {
-    Write-Host "⚠️ I need credentials to connect to $ServerName." -ForegroundColor Yellow
+# Load saved credentials (if needed for explicit auth)
+$credPath = Join-Path $HOME ".wininvestigator" "credentials.xml"
+$credential = $null
+if (Test-Path $credPath) {
+    $credential = Import-Clixml -Path $credPath
+} else {
+    Write-Host "⚠️ No saved credentials found." -ForegroundColor Yellow
     Write-Host ""
-    Write-Host "Please run this in your PowerShell session:" -ForegroundColor Cyan
-    Write-Host "  `$credential = Get-Credential" -ForegroundColor White
+    Write-Host "To save credentials for server connections, run:" -ForegroundColor Cyan
+    Write-Host '  New-Item -ItemType Directory -Path "$HOME\.wininvestigator" -Force' -ForegroundColor White
+    Write-Host '  Get-Credential | Export-Clixml -Path "$HOME\.wininvestigator\credentials.xml"' -ForegroundColor White
     Write-Host ""
-    Write-Host "Then ask me again and I'll connect using those credentials." -ForegroundColor Cyan
+    Write-Host "Then ask me again and I'll load the saved credentials." -ForegroundColor Cyan
     return
 }
 
 # Establish PSSession
 $SessionOption = New-PSSessionOption -SkipCACheck -SkipCNCheck
-$session = New-PSSession -ComputerName $ServerName -UseSSL -Port 5986 -SessionOption $SessionOption -Credential $credential -ErrorAction Stop
+$params = @{
+    ComputerName  = $ServerName
+    UseSSL        = $true
+    Port          = 5986
+    SessionOption = $SessionOption
+    ErrorAction   = 'Stop'
+}
+if ($credential) { $params['Credential'] = $credential }
+$session = New-PSSession @params
 
-# One-shot Invoke-Command (current user - no credential needed)
+# One-shot Invoke-Command (loads credential if available, otherwise uses current user)
+$credPath = Join-Path $HOME ".wininvestigator" "credentials.xml"
+$credential = $null
+if (Test-Path $credPath) { $credential = Import-Clixml -Path $credPath }
+
 $SessionOption = New-PSSessionOption -SkipCACheck -SkipCNCheck
 $invokeParams = @{
     ComputerName  = $ServerName
@@ -188,7 +205,6 @@ $invokeParams = @{
     ScriptBlock   = { Get-ComputerInfo | Select ComputerName, OsName, OsVersion }
     ErrorAction   = 'Stop'
 }
-# Only add Credential if variable exists (for explicit auth scenarios)
 if ($credential) { $invokeParams['Credential'] = $credential }
 $result = Invoke-Command @invokeParams
 ```
@@ -199,8 +215,11 @@ $result = Invoke-Command @invokeParams
 
 ```powershell
 $ServerName = "TARGET_SERVER"
-# If explicit credentials needed, check for $credential variable
-# For current user (default), proceed without credential
+# Load credentials if saved (for explicit auth), otherwise use current user
+$credPath = Join-Path $HOME ".wininvestigator" "credentials.xml"
+$credential = $null
+if (Test-Path $credPath) { $credential = Import-Clixml -Path $credPath }
+
 $scriptBlock = {
     $os = Get-CimInstance -ClassName Win32_OperatingSystem
     $cs = Get-CimInstance -ClassName Win32_ComputerSystem
@@ -234,6 +253,11 @@ $result = Invoke-Command @invokeParams
 
 ```powershell
 $ServerName = "TARGET_SERVER"
+# Load credentials if saved
+$credPath = Join-Path $HOME ".wininvestigator" "credentials.xml"
+$credential = $null
+if (Test-Path $credPath) { $credential = Import-Clixml -Path $credPath }
+
 $scriptBlock = {
     $processes = Get-CimInstance -ClassName Win32_Process
     $processData = $processes | ForEach-Object {
@@ -270,6 +294,11 @@ $result = Invoke-Command @invokeParams
 
 ```powershell
 $ServerName = "TARGET_SERVER"
+# Load credentials if saved
+$credPath = Join-Path $HOME ".wininvestigator" "credentials.xml"
+$credential = $null
+if (Test-Path $credPath) { $credential = Import-Clixml -Path $credPath }
+
 $scriptBlock = {
     $cpuCounter = Get-Counter '\Processor(_Total)\% Processor Time'
     $cpuAvg = [math]::Round($cpuCounter.CounterSamples[0].CookedValue, 2)
@@ -305,6 +334,11 @@ $result = Invoke-Command @invokeParams
 
 ```powershell
 $ServerName = "TARGET_SERVER"
+# Load credentials if saved
+$credPath = Join-Path $HOME ".wininvestigator" "credentials.xml"
+$credential = $null
+if (Test-Path $credPath) { $credential = Import-Clixml -Path $credPath }
+
 $scriptBlock = {
     $volumes = Get-Volume | Where-Object { $_.DriveLetter }
     $volumeData = $volumes | ForEach-Object {
@@ -340,6 +374,11 @@ $result = Invoke-Command @invokeParams
 
 ```powershell
 $ServerName = "TARGET_SERVER"
+# Load credentials if saved
+$credPath = Join-Path $HOME ".wininvestigator" "credentials.xml"
+$credential = $null
+if (Test-Path $credPath) { $credential = Import-Clixml -Path $credPath }
+
 $scriptBlock = {
     $services = Get-CimInstance -ClassName Win32_Service
     $shouldBeRunning = $services | Where-Object { $_.StartMode -eq "Auto" -and $_.State -ne "Running" }
@@ -368,6 +407,11 @@ $result = Invoke-Command @invokeParams
 
 ```powershell
 $ServerName = "TARGET_SERVER"
+# Load credentials if saved
+$credPath = Join-Path $HOME ".wininvestigator" "credentials.xml"
+$credential = $null
+if (Test-Path $credPath) { $credential = Import-Clixml -Path $credPath }
+
 $scriptBlock = {
     $adapters = Get-NetAdapter | Where-Object { $_.Status -ne "Disabled" }
     $adapterInfo = $adapters | ForEach-Object {
@@ -403,6 +447,11 @@ $result = Invoke-Command @invokeParams
 ```powershell
 $ServerName = "TARGET_SERVER"
 $DaysBack = 7
+# Load credentials if saved
+$credPath = Join-Path $HOME ".wininvestigator" "credentials.xml"
+$credential = $null
+if (Test-Path $credPath) { $credential = Import-Clixml -Path $credPath }
+
 $scriptBlock = {
     param($days)
     $startDate = (Get-Date).AddDays(-$days)
@@ -462,24 +511,28 @@ New-NetFirewallRule -DisplayName "WinRM HTTPS" -Direction Inbound -Protocol TCP 
 $ServerName = "20.100.50.25"  # Azure public IP
 Test-NetConnection -ComputerName $ServerName -Port 5986
 
-# Step 4: Check for $credential variable
-if (-not $credential) {
-    Write-Host "⚠️ I need credentials to connect to Azure VM $ServerName." -ForegroundColor Yellow
+# Step 4: Load saved credentials (Azure VMs ALWAYS need explicit credentials)
+$credPath = Join-Path $HOME ".wininvestigator" "credentials.xml"
+if (-not (Test-Path $credPath)) {
+    Write-Host "⚠️ No saved credentials found. Azure VMs require explicit credentials." -ForegroundColor Yellow
     Write-Host ""
-    Write-Host "Please run this in your PowerShell session:" -ForegroundColor Cyan
-    Write-Host "  `$credential = Get-Credential" -ForegroundColor White
+    Write-Host "To save credentials, run:" -ForegroundColor Cyan
+    Write-Host '  New-Item -ItemType Directory -Path "$HOME\.wininvestigator" -Force' -ForegroundColor White
+    Write-Host '  Get-Credential | Export-Clixml -Path "$HOME\.wininvestigator\credentials.xml"' -ForegroundColor White
     Write-Host ""
     Write-Host "Username formats for Azure VMs:" -ForegroundColor Gray
     Write-Host "  • Local account: .\AdminUser  or  VMName\AdminUser" -ForegroundColor Gray
     Write-Host "  • Azure AD account: user@domain.com" -ForegroundColor Gray
     Write-Host ""
-    Write-Host "Then ask me again and I'll connect using those credentials." -ForegroundColor Cyan
+    Write-Host "Then ask me again and I'll connect." -ForegroundColor Cyan
     return
 }
 
-# Step 5: Establish session with pre-created credential
+$credential = Import-Clixml -Path $credPath
+
+# Step 5: Establish session with loaded credential
 $SessionOption = New-PSSessionOption -SkipCACheck -SkipCNCheck
-$session = New-PSSession -ComputerName $ServerName -Credential $credential -UseSSL -Port 5986 -SessionOption $SessionOption
+$session = New-PSSession -ComputerName $ServerName -UseSSL -Port 5986 -Credential $credential -SessionOption $SessionOption
 ```
 
 **Username formats for Azure VMs:**
@@ -501,26 +554,7 @@ conversation are visible in plain text and stored in chat history. This is a cri
 
 ### How Credentials Work
 
-Copilot CLI cannot reliably pop up GUI dialogs. Users must create credentials BEFORE starting 
-Copilot CLI (or in a separate PowerShell window).
-
-**The user creates a credential variable in their PowerShell session:**
-```powershell
-# User runs this BEFORE starting Copilot CLI (or when prompted):
-$credential = Get-Credential
-```
-
-**The agent checks for the variable and uses it:**
-```powershell
-# Agent checks if credential exists
-if (-not $credential) {
-    # Tell user how to create it
-}
-
-# Agent uses it in remoting commands
-$SessionOption = New-PSSessionOption -SkipCACheck -SkipCNCheck
-$session = New-PSSession -ComputerName ServerName -UseSSL -Port 5986 -Credential $credential -SessionOption $SessionOption
-```
+**NEW APPROACH:** Credentials are saved to encrypted files using PowerShell's Export-Clixml/Import-Clixml. This uses DPAPI encryption, which ties the encrypted data to the current user and machine — only the same user on the same machine can decrypt.
 
 ### Default: Current User (No Credential Needed)
 
@@ -529,73 +563,129 @@ The current user's identity is used automatically via implicit credentials.
 
 ```
 User: "Check server01"
-→ Connect using current user identity (no $credential variable needed)
+→ Connect using current user identity (no credential file needed)
 ```
 
-### Explicit Credentials: Pre-Created Variable
+### Explicit Credentials: File-Based Encrypted Storage
 
-When the user needs explicit credentials (Azure VMs, cross-domain, workgroup servers):
+When the user needs explicit credentials (Azure VMs, cross-domain, workgroup servers), they save credentials to an encrypted file **ONE TIME** before using win-investigator.
 
-**STEP 1: Check if $credential exists**
+#### One-Time User Setup (Before First Use):
+
 ```powershell
-if (-not $credential) {
-    Write-Host "⚠️ I need credentials to connect to $ServerName." -ForegroundColor Yellow
+# Create the credentials directory
+New-Item -ItemType Directory -Path "$HOME\.wininvestigator" -Force
+
+# Save credentials to encrypted file (opens GUI dialog)
+Get-Credential | Export-Clixml -Path "$HOME\.wininvestigator\credentials.xml"
+```
+
+This opens a Windows login dialog. User enters username/password in the GUI, and PowerShell encrypts and saves it. The file contains encrypted data (DPAPI), not plain text.
+
+#### Agent Runtime Pattern:
+
+**STEP 1: Check if credential file exists and load it**
+```powershell
+$credPath = Join-Path $HOME ".wininvestigator" "credentials.xml"
+if (Test-Path $credPath) {
+    $credential = Import-Clixml -Path $credPath
+} else {
+    Write-Host "⚠️ No saved credentials found." -ForegroundColor Yellow
     Write-Host ""
-    Write-Host "Please run this in your PowerShell session:" -ForegroundColor Cyan
-    Write-Host "  `$credential = Get-Credential" -ForegroundColor White
+    Write-Host "To save credentials for server connections, run:" -ForegroundColor Cyan
+    Write-Host '  New-Item -ItemType Directory -Path "$HOME\.wininvestigator" -Force' -ForegroundColor White
+    Write-Host '  Get-Credential | Export-Clixml -Path "$HOME\.wininvestigator\credentials.xml"' -ForegroundColor White
     Write-Host ""
-    Write-Host "Then ask me again and I'll connect using those credentials." -ForegroundColor Cyan
+    Write-Host "Then ask me again and I'll load the saved credentials." -ForegroundColor Cyan
     return
 }
 ```
 
-**STEP 2: Use $credential in connection commands**
+**STEP 2: Use loaded credential in connection commands**
 ```powershell
 $SessionOption = New-PSSessionOption -SkipCACheck -SkipCNCheck
-$session = New-PSSession -ComputerName $ServerName -UseSSL -Port 5986 -Credential $credential -SessionOption $SessionOption
+$params = @{
+    ComputerName  = $ServerName
+    UseSSL        = $true
+    Port          = 5986
+    SessionOption = $SessionOption
+}
+if ($credential) { $params['Credential'] = $credential }
+$session = New-PSSession @params
 ```
 
-**Message template when $credential is missing:**
+**Message template when credential file is missing:**
 ```
-⚠️ I need credentials to connect to {ServerName}.
+⚠️ No saved credentials found.
 
-Please run this in your PowerShell session:
-  $credential = Get-Credential
+To save credentials for server connections, run:
+  New-Item -ItemType Directory -Path "$HOME\.wininvestigator" -Force
+  Get-Credential | Export-Clixml -Path "$HOME\.wininvestigator\credentials.xml"
 
-Then ask me again and I'll connect using those credentials.
+Then ask me again and I'll load the saved credentials.
 ```
 
-**Why this approach:**
-- Copilot CLI runs in non-interactive mode and can't pop up dialogs reliably
-- Users run `Get-Credential` in their PowerShell session (outside Copilot CLI)
-- The secure Windows dialog appears in their PowerShell window
-- The `$credential` variable stays in their session
-- The agent uses the pre-created `$credential` variable when connecting
+### Server-Specific Credentials (Multiple Servers)
+
+For environments with multiple servers requiring different credentials:
+
+**User creates server-specific credential files:**
+```powershell
+# Save credentials for specific servers
+Get-Credential | Export-Clixml -Path "$HOME\.wininvestigator\server01-cred.xml"
+Get-Credential | Export-Clixml -Path "$HOME\.wininvestigator\azure-vm-cred.xml"
+```
+
+**Agent checks for server-specific credential first, falls back to default:**
+```powershell
+$serverCredPath = Join-Path $HOME ".wininvestigator" "$ServerName-cred.xml"
+$defaultCredPath = Join-Path $HOME ".wininvestigator" "credentials.xml"
+
+if (Test-Path $serverCredPath) {
+    $credential = Import-Clixml -Path $serverCredPath
+    Write-Host "✓ Loaded credentials from $ServerName-cred.xml" -ForegroundColor Green
+} elseif (Test-Path $defaultCredPath) {
+    $credential = Import-Clixml -Path $defaultCredPath
+    Write-Host "✓ Loaded default credentials" -ForegroundColor Green
+}
+# If neither exists, use current user (implicit credentials)
+```
 
 ### Azure VM Credentials (Always Required)
 
 Azure VMs over public IP **always need explicit credentials** — Kerberos does not work over the public internet.
 
-**Check for $credential before connecting:**
+**Check for credential file before connecting:**
 ```powershell
-if (-not $credential) {
-    Write-Host "⚠️ I need credentials to connect to Azure VM $ServerName." -ForegroundColor Yellow
+$credPath = Join-Path $HOME ".wininvestigator" "credentials.xml"
+if (-not (Test-Path $credPath)) {
+    Write-Host "⚠️ No saved credentials found. Azure VMs require explicit credentials." -ForegroundColor Yellow
     Write-Host ""
-    Write-Host "Please run this in your PowerShell session:" -ForegroundColor Cyan
-    Write-Host "  `$credential = Get-Credential" -ForegroundColor White
+    Write-Host "To save credentials, run:" -ForegroundColor Cyan
+    Write-Host '  New-Item -ItemType Directory -Path "$HOME\.wininvestigator" -Force' -ForegroundColor White
+    Write-Host '  Get-Credential | Export-Clixml -Path "$HOME\.wininvestigator\credentials.xml"' -ForegroundColor White
     Write-Host ""
     Write-Host "Username formats for Azure VMs:" -ForegroundColor Gray
     Write-Host "  • Local account: .\AdminUser  or  VMName\AdminUser" -ForegroundColor Gray
     Write-Host "  • Azure AD account: user@domain.com" -ForegroundColor Gray
     Write-Host ""
-    Write-Host "Then ask me again and I'll connect using those credentials." -ForegroundColor Cyan
+    Write-Host "Then ask me again and I'll connect." -ForegroundColor Cyan
     return
 }
 
-# Use pre-created credential
+$credential = Import-Clixml -Path $credPath
 $SessionOption = New-PSSessionOption -SkipCACheck -SkipCNCheck
 $session = New-PSSession -ComputerName $ServerName -UseSSL -Port 5986 -Credential $credential -SessionOption $SessionOption
 ```
+
+### Security Notes
+
+✅ **DPAPI encryption** — File contains encrypted data, not plain text passwords
+✅ **Tied to user + machine** — Only the creating user on the creating machine can decrypt
+✅ **Standard PowerShell pattern** — Used in enterprise automation for years
+✅ **No passwords in chat** — User creates credential file outside of Copilot CLI
+❌ **Not portable** — Credential files cannot be moved between machines or users (by design)
+❌ **Don't commit to git** — Credential files live in `$HOME\.wininvestigator\`, not in the repo
 
 See the **azure-connectivity** skill for Azure-specific setup (NSG rules, WinRM listener, alternatives).
 

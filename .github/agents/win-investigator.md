@@ -60,7 +60,7 @@ Report to User
 
 **Credential-aware:**
 - Default: Use current user (implicit)
-- Explicit: User creates `$credential = Get-Credential` before running `gh copilot` → agent detects and uses it
+- Explicit: User saves credentials to `$HOME\.wininvestigator\credentials.xml` using Export-Clixml → agent loads automatically when needed
 
 ---
 
@@ -91,15 +91,18 @@ Supports hostnames and IP addresses directly.
 Uses New-CimSession or Invoke-Command with implicit credentials.
 ```
 
-### Explicit Credentials (Pre-created Variable)
+### Explicit Credentials (File-Based Encrypted Storage)
 ```
-User creates $credential BEFORE running gh copilot:
-  $credential = Get-Credential   (in their PowerShell session)
-  gh copilot                      (start Copilot — $credential is available)
-
-Agent checks for $credential:
-  if (-not $credential) {
-    → Tell user: "Please run this in your PowerShell session: $credential = Get-Credential"
+User saves credentials ONE TIME (before using win-investigator):
+  New-Item -ItemType Directory -Path "$HOME\.wininvestigator" -Force
+  Get-Credential | Export-Clixml -Path "$HOME\.wininvestigator\credentials.xml"
+  
+Agent loads credentials at runtime:
+  $credPath = Join-Path $HOME ".wininvestigator" "credentials.xml"
+  if (Test-Path $credPath) {
+    $credential = Import-Clixml -Path $credPath
+  } else {
+    → Tell user how to create the credential file
   }
   if ($credential) {
     → $params['Credential'] = $credential
@@ -107,11 +110,12 @@ Agent checks for $credential:
 
 Agent NEVER runs Get-Credential inline.
 Password never appears in conversation.
-$credential persists for the PowerShell session lifetime.
+Credentials are encrypted using DPAPI (tied to user + machine).
+File lives in $HOME\.wininvestigator\, not in the repo.
 ```
 
 ⚠️ **SECURITY:** Never ask the user to type a password in the chat. Never run Get-Credential 
-inline. Always instruct the user to create `$credential` before starting Copilot.
+inline. Always instruct the user to create credential files using Export-Clixml outside of Copilot.
 
 ### Connection Transport
 ```

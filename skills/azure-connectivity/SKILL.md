@@ -28,15 +28,16 @@ Establish PowerShell remoting sessions to Azure VMs accessed via public IP addre
 
 ### On the Client Machine (your workstation)
 
-1. **Explicit credentials ready** — Kerberos does not work over public IP. User must create the 
-   `$credential` variable BEFORE running Copilot CLI (or when prompted by the agent):
+1. **Explicit credentials ready** — Kerberos does not work over public IP. User must save credentials 
+   to an encrypted file BEFORE using win-investigator:
    ```powershell
-   $credential = Get-Credential
+   New-Item -ItemType Directory -Path "$HOME\.wininvestigator" -Force
+   Get-Credential | Export-Clixml -Path "$HOME\.wininvestigator\credentials.xml"
    ```
 2. No TrustedHosts modification needed — `-SkipCACheck` and `-SkipCNCheck` handle certificate validation
 
-⚠️ **SECURITY: NEVER ask users to type Azure VM passwords in the chat.** The user creates the 
-`$credential` variable in their PowerShell session, where the secure Windows login dialog opens.
+⚠️ **SECURITY: NEVER ask users to type Azure VM passwords in the chat.** The user creates an encrypted 
+credential file outside of Copilot CLI using Export-Clixml (DPAPI encryption).
 
 ---
 
@@ -138,21 +139,24 @@ try {
 ```powershell
 $ServerName = "20.100.50.25"  # Azure VM public IP or hostname
 
-# Check if $credential variable exists (must be created by user in their PowerShell session)
-if (-not $credential) {
-    Write-Host "⚠️ I need credentials to connect to Azure VM $ServerName." -ForegroundColor Yellow
+# Load saved credentials (Azure VMs ALWAYS require explicit credentials)
+$credPath = Join-Path $HOME ".wininvestigator" "credentials.xml"
+if (-not (Test-Path $credPath)) {
+    Write-Host "⚠️ No saved credentials found. Azure VMs require explicit credentials." -ForegroundColor Yellow
     Write-Host ""
-    Write-Host "Please run this in your PowerShell session:" -ForegroundColor Cyan
-    Write-Host "  `$credential = Get-Credential" -ForegroundColor White
+    Write-Host "To save credentials, run:" -ForegroundColor Cyan
+    Write-Host '  New-Item -ItemType Directory -Path "$HOME\.wininvestigator" -Force' -ForegroundColor White
+    Write-Host '  Get-Credential | Export-Clixml -Path "$HOME\.wininvestigator\credentials.xml"' -ForegroundColor White
     Write-Host ""
     Write-Host "Username formats for Azure VMs:" -ForegroundColor Gray
     Write-Host "  • Local account: .\AdminUser  or  VMName\AdminUser" -ForegroundColor Gray
     Write-Host "  • Azure AD account: user@domain.com" -ForegroundColor Gray
     Write-Host ""
-    Write-Host "Then ask me again and I'll connect using those credentials." -ForegroundColor Cyan
+    Write-Host "Then ask me again and I'll connect." -ForegroundColor Cyan
     return
 }
 
+$credential = Import-Clixml -Path $credPath
 $SessionOption = New-PSSessionOption -SkipCACheck -SkipCNCheck
 
 try {
@@ -185,9 +189,9 @@ try {
     Write-Warning "✗ PSSession failed: $($_.Exception.Message)"
 
     if ($_.Exception.Message -match "Access is denied") {
-        Write-Host "  → Verify `$credential variable is correct" -ForegroundColor Yellow
+        Write-Host "  → Verify saved credentials are correct" -ForegroundColor Yellow
         Write-Host "  → Username format: VM_NAME\AdminUser or user@domain.com" -ForegroundColor Yellow
-        Write-Host "  → Create new credential: `$credential = Get-Credential" -ForegroundColor Yellow
+        Write-Host "  → Re-create credential file if needed" -ForegroundColor Yellow
     } elseif ($_.Exception.Message -match "cannot connect") {
         Write-Host "  → Check NSG, firewall, and WinRM HTTPS listener" -ForegroundColor Yellow
     } elseif ($_.Exception.Message -match "certificate") {

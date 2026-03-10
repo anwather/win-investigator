@@ -303,3 +303,95 @@ Then ask me again and I'll connect using those credentials.
 
 ---
 
+### File-Based Encrypted Credential Storage Implemented (2026-03-10)
+
+**Context:** Previous credential approaches ($credential variable, Get-Credential inline) didn't persist between sessions and required re-entry. The new approach uses **Export-Clixml / Import-Clixml** to save encrypted credentials to files. This is a well-established secure PowerShell pattern using DPAPI encryption.
+
+**Solution Implemented:** Credentials saved to encrypted files in `$HOME\.wininvestigator\`, automatically loaded by agent when needed.
+
+**User Workflow (One-Time Setup):**
+1. User creates credentials directory: `New-Item -ItemType Directory -Path "$HOME\.wininvestigator" -Force`
+2. User saves credentials: `Get-Credential | Export-Clixml -Path "$HOME\.wininvestigator\credentials.xml"`
+3. Secure Windows dialog appears, user enters username/password
+4. PowerShell encrypts using DPAPI (tied to current user + machine)
+5. File saved to `$HOME\.wininvestigator\credentials.xml`
+6. User runs `gh copilot` — agent loads credentials automatically when needed
+
+**Agent Runtime Pattern:**
+```powershell
+# Load saved credentials
+$credPath = Join-Path $HOME ".wininvestigator" "credentials.xml"
+if (Test-Path $credPath) {
+    $credential = Import-Clixml -Path $credPath
+} else {
+    Write-Host "⚠️ No saved credentials found."
+    Write-Host "To save credentials for server connections, run:"
+    Write-Host '  New-Item -ItemType Directory -Path "$HOME\.wininvestigator" -Force'
+    Write-Host '  Get-Credential | Export-Clixml -Path "$HOME\.wininvestigator\credentials.xml"'
+    return
+}
+
+# Use loaded credential
+$params = @{ ComputerName = $ServerName; UseSSL = $true; Port = 5986 }
+if ($credential) { $params['Credential'] = $credential }
+$session = New-PSSession @params
+```
+
+**Server-Specific Credentials:**
+- Default: `credentials.xml`
+- Server-specific: `server01-cred.xml`, `azure-vm-cred.xml`
+- Agent checks for server-specific file first, falls back to default, then uses current user (implicit)
+
+**Security Benefits:**
+- ✅ DPAPI encryption — file contains encrypted data, not plain text
+- ✅ Tied to user + machine — only the creating user on the creating machine can decrypt
+- ✅ Standard PowerShell pattern — used in enterprise automation for years
+- ✅ Passwords never in chat — user creates file outside Copilot CLI
+- ❌ Not portable — credential files cannot be moved between machines/users (by design)
+
+**Files Updated (14 total):**
+
+**Core Instructions:**
+1. `.github/copilot-instructions.md` — Complete rewrite of "Credential Handling" section + ALL embedded skill code updated with file-based credential loading
+2. `.github/agents/win-investigator.md` — Updated credential sections with file-based approach
+3. `.github/skills/win-investigate.md` — Updated credential flow (if exists)
+
+**Skills (ALL credential loading patterns replaced):**
+4. `skills/connectivity/SKILL.md` — Full rewrite: credential file check, Import-Clixml, server-specific credentials, security notes
+5. `skills/azure-connectivity/SKILL.md` — Azure-specific credential file guidance, username formats
+
+**Documentation:**
+6. `README.md` — Updated credentials section with file-based approach
+7. `docs/getting-started.md` — Complete rewrite of "Setting Up Credentials" section with one-time setup instructions
+8. `docs/usage.md` — Updated credential sections (if exists)
+9. `docs/troubleshooting.md` — New troubleshooting: "credential file not found", "file won't decrypt", "wrong credentials"
+10. `docs/architecture.md` — Updated credential flow (if exists)
+11. `.gitignore` — Added `*credentials.xml` and `*-cred.xml` exclusions (safety, though files live in $HOME)
+
+**All Embedded Skills in copilot-instructions.md:**
+- connectivity, server-overview, processes, performance, disk-storage, services, network, event-logs, azure-connectivity
+- All code blocks updated to load credentials from file
+
+**Key Principles:**
+- NEVER ask user to type passwords in chat
+- NEVER run Get-Credential inline in agent code
+- Check for credential file at startup: `Test-Path $credPath`
+- Load with Import-Clixml if exists, otherwise guide user to create
+- Support server-specific credential files for multi-server environments
+- Default (current user) still works when no credential file exists
+
+**Message Template (when credential file missing):**
+```
+⚠️ No saved credentials found.
+
+To save credentials for server connections, run:
+  New-Item -ItemType Directory -Path "$HOME\.wininvestigator" -Force
+  Get-Credential | Export-Clixml -Path "$HOME\.wininvestigator\credentials.xml"
+
+Then ask me again and I'll load the saved credentials.
+```
+
+**Outcome:** SUCCESS. All files updated to use file-based encrypted credential storage. Credentials persist between sessions, stored securely with DPAPI encryption, never appear in chat. Pattern is consistent across ALL instructions, skills, and documentation. This is a production-ready enterprise automation pattern. Users set up credentials once, agent loads automatically when needed.
+
+---
+

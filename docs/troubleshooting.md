@@ -12,8 +12,8 @@ description: "Fixes for common setup and connection issues. Start here if someth
 {: .fs-6 .fw-300 }
 
 {: .important }
-> **Security Note:** Never type passwords in the Copilot CLI chat. Always create your credential 
-> in PowerShell **before** running `gh copilot`: `$credential = Get-Credential`
+> **Security Note:** Never type passwords in the Copilot CLI chat. Always create credential files 
+> using Export-Clixml **before** running `gh copilot`: `Get-Credential | Export-Clixml -Path "$HOME\.wininvestigator\credentials.xml"`
 
 ## Table of contents
 {: .no_toc .text-delta }
@@ -115,74 +115,80 @@ gh extension list
 
 ## Credential Issues
 
-### `$credential` variable not found
+### Credential file not found
 
-**Problem:** The agent says `$credential` is not defined, or asks you to create it.
+**Problem:** The agent says "No saved credentials found" when trying to connect.
 
-**Cause:** You need to create the `$credential` variable in your PowerShell session **before** running `gh copilot`.
+**Cause:** You haven't created the encrypted credential file yet.
 
 **Solution:**
 
-Run this in your PowerShell session (not inside Copilot chat):
+Run these commands in your PowerShell session (outside of Copilot):
 
 ```powershell
-$credential = Get-Credential
+# Step 1: Create the credentials directory
+New-Item -ItemType Directory -Path "$HOME\.wininvestigator" -Force
+
+# Step 2: Save your credentials (opens secure GUI dialog)
+Get-Credential | Export-Clixml -Path "$HOME\.wininvestigator\credentials.xml"
 ```
 
-A secure Windows dialog will open. Enter your username and password there, then start Copilot:
+A secure Windows dialog will open. Enter your username and password there. The file will be saved with DPAPI encryption. Then start Copilot:
 
 ```powershell
 gh copilot
 ```
 
-The agent will automatically detect and use the `$credential` variable for remote connections.
+The agent will automatically load the saved credentials when needed.
 
 {: .note }
-> The `$credential` variable persists for the lifetime of your PowerShell session. You only need to set it once per session.
+> Credential files persist until you delete them. You only need to create them once per machine (unless you need to update credentials).
 
-### Credentials keep being asked for the same server
+### Credential file won't decrypt
 
-**Problem:** Every investigation requires you to create `$credential` again.
+**Problem:** The agent can't decrypt the credential file, or you get an encryption error.
 
-**Cause:** The `$credential` variable only lasts for the current PowerShell session. If you close and reopen PowerShell, you need to set it again.
+**Cause:** Credential files are encrypted with DPAPI and tied to the specific user + machine. If you:
+- Moved the file from another machine
+- Are logged in as a different user
+- Restored from backup on a different computer
+
+...the file cannot be decrypted.
 
 **Solution:**
 
-Set `$credential` once at the start of your PowerShell session, then run as many `gh copilot` investigations as you need:
+Delete the old file and create a new one on this machine:
 
 ```powershell
-# Set once per session (before running gh copilot):
-$credential = Get-Credential
+# Delete old credential file
+Remove-Item "$HOME\.wininvestigator\credentials.xml" -ErrorAction SilentlyContinue
 
-# Now run Copilot — credentials are reused automatically:
-gh copilot
-# ? "Check server01"
-# ? "Check server02"
-# ? "Check server03"
+# Create new credential file for this user + machine
+Get-Credential | Export-Clixml -Path "$HOME\.wininvestigator\credentials.xml"
 ```
 
-If you open a new PowerShell window, run `$credential = Get-Credential` again before starting Copilot.
+{: .warning }
+> DPAPI encryption is not portable by design — this is a security feature. Credential files only work on the machine where they were created, for the user who created them.
 
-### "Wrong username or password"
+### Wrong username or password (Access Denied)
 
-**Problem:** You created `$credential` but connections fail with "Access denied".
+**Problem:** The agent loads credentials but connections fail with "Access denied".
 
 **Solution:**
 
-1. **Verify the username format** when creating `$credential`:
+1. **Verify the username format** when creating the credential file:
    - Domain account: `domain\username` or `username@domain.com`
    - Local account: `.\username` or `ServerName\username`
    - Azure VM local: `VMName\AdminUser`
    - Azure VM with Azure AD: `user@domain.com`
 
+2. **Re-create the credential file** with the correct username and password:
    ```powershell
-   # Re-create with the correct username format:
-   $credential = Get-Credential
+   Remove-Item "$HOME\.wininvestigator\credentials.xml"
+   Get-Credential | Export-Clixml -Path "$HOME\.wininvestigator\credentials.xml"
    ```
 
-2. **Check Caps Lock** is off when typing password in the credential dialog
-
-3. **Re-create the credential** — Run `$credential = Get-Credential` again and be careful with the password
+3. **Check Caps Lock** is off when typing password in the credential dialog
 
 4. **Verify the account is not locked**:
    ```powershell
@@ -345,7 +351,7 @@ Test-WSMan server01 -UseSSL -Port 5986 -SessionOption $SessionOption
 4. ✅ WinRM service running on target: `Get-Service WinRM`
 5. ✅ Firewall allows port 5986 on target
 6. ✅ Test from your machine: `Test-WSMan server01 -UseSSL -Port 5986 -SkipCACheck -SkipCNCheck`
-7. ✅ You have admin rights on target (or use explicit credentials)
+7. ✅ You have admin rights on target (or saved credentials with Export-Clixml)
 
 If all of these pass, try your investigation again.
 

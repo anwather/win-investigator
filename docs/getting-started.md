@@ -190,22 +190,27 @@ User: "What is going on with server01?"
 → Connects using your current Windows identity (seamless)
 ```
 
-### Explicit: Pre-Created Credential Variable
+### Explicit: File-Based Encrypted Credentials
 
-When connecting to servers where you need different credentials (like Azure VMs or cross-domain servers), 
-you must **create a `$credential` variable BEFORE running Copilot CLI** (or when prompted by the agent).
+When connecting to servers where you need different credentials (like Azure VMs, cross-domain servers, or workgroup servers), 
+you must **save credentials to an encrypted file ONE TIME** before using win-investigator.
 
-**How to create credentials:**
+**How to set up credentials (one-time):**
 
-1. Open your PowerShell terminal (the one where you'll run `gh copilot`)
-2. Run this command:
+1. Open your PowerShell terminal
+2. Create the credentials directory:
    ```powershell
-   $credential = Get-Credential
+   New-Item -ItemType Directory -Path "$HOME\.wininvestigator" -Force
    ```
-3. A **secure Windows login dialog** will appear
-4. Enter your username and password in the dialog (NOT in the chat)
-5. The password is entered securely — **never visible in the chat or history**
-6. Start or resume Copilot CLI — the agent will use your pre-created `$credential` variable
+3. Save your credentials to an encrypted file:
+   ```powershell
+   Get-Credential | Export-Clixml -Path "$HOME\.wininvestigator\credentials.xml"
+   ```
+4. A **secure Windows login dialog** will appear
+5. Enter your username and password in the dialog (NOT in the chat)
+6. The password is entered securely and encrypted using DPAPI (tied to your user + machine)
+7. The encrypted file is saved to `$HOME\.wininvestigator\credentials.xml`
+8. Start `gh copilot` — the agent will load the credentials automatically when needed
 
 **What the dialog looks like:**
 - A standard Windows credential prompt window pops up
@@ -213,27 +218,35 @@ you must **create a `$credential` variable BEFORE running Copilot CLI** (or when
 - Fields: Username and Password (hidden dots)
 - You type the password there, NOT in the Copilot chat
 
-**Why this approach:**
-- Copilot CLI runs in non-interactive mode and can't reliably pop up GUI dialogs
-- You create the credential in your PowerShell session (outside Copilot CLI)
-- The `$credential` variable stays in your session
-- The agent checks for and uses the pre-created variable
-- Passwords never appear in chat history
+**Security benefits:**
+- **DPAPI encryption** — Only you on this machine can decrypt the file
+- **Not portable** — File cannot be moved between machines or users (by design)
+- **Never in chat** — Passwords never appear in chat history
+- **Standard PowerShell pattern** — Used in enterprise automation for years
 
-**If the agent needs credentials and you haven't created them:**
+**If the agent needs credentials and you haven't created the file:**
 The agent will tell you:
 ```
-⚠️ I need credentials to connect to server01.
+⚠️ No saved credentials found.
 
-Please run this in your PowerShell session:
-  $credential = Get-Credential
+To save credentials for server connections, run:
+  New-Item -ItemType Directory -Path "$HOME\.wininvestigator" -Force
+  Get-Credential | Export-Clixml -Path "$HOME\.wininvestigator\credentials.xml"
 
-Then ask me again and I'll connect using those credentials.
+Then ask me again and I'll load the saved credentials.
 ```
 
+**Multiple servers with different credentials:**
+You can create server-specific credential files:
+```powershell
+Get-Credential | Export-Clixml -Path "$HOME\.wininvestigator\server01-cred.xml"
+Get-Credential | Export-Clixml -Path "$HOME\.wininvestigator\azure-vm-cred.xml"
+```
+The agent will check for server-specific credentials first, then fall back to the default `credentials.xml`.
+
 ⚠️ **IMPORTANT SECURITY NOTE:** Never type passwords in the Copilot CLI chat. Passwords typed 
-in the conversation are visible in plain text and stored in chat history. Always create the 
-`$credential` variable in your PowerShell session where the secure GUI dialog opens.
+in the conversation are visible in plain text and stored in chat history. Always create credential 
+files using Export-Clixml outside of Copilot CLI.
 
 ---
 

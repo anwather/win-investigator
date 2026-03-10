@@ -162,7 +162,7 @@ Test-WSMan server01 -UseSSL -Port 5986 -SkipCACheck -SkipCNCheck
 ### Admin Rights on Target Servers
 
 - Your user must have **local administrator** rights on the target, OR
-- You can provide **different credentials** when asking (create `$credential = Get-Credential` before running Copilot)
+- You can provide **different credentials** when asking (save them to `$HOME\.wininvestigator\credentials.xml` using Export-Clixml)
 
 ### GitHub Account
 
@@ -183,30 +183,34 @@ gh copilot
 # Uses: your-domain\your-user (automatically)
 ```
 
-### Explicit Credentials (Pre-created Variable)
+### Explicit Credentials (File-Based Encrypted Storage)
 
-If you need different credentials (e.g., a dedicated admin account), create the `$credential`
-variable **before** starting Copilot:
+If you need different credentials (e.g., a dedicated admin account, Azure VM access, cross-domain), 
+save them to an encrypted file **one time** before using win-investigator:
 
 ```powershell
-# Step 1: Create the credential in your PowerShell session
-$credential = Get-Credential
-# A secure Windows dialog opens — enter username and password there
+# Step 1: Create the credentials directory
+New-Item -ItemType Directory -Path "$HOME\.wininvestigator" -Force
 
-# Step 2: Start Copilot (credential is automatically available)
+# Step 2: Save your credentials (opens secure Windows dialog)
+Get-Credential | Export-Clixml -Path "$HOME\.wininvestigator\credentials.xml"
+# Enter username and password in the GUI dialog
+
+# Step 3: Start Copilot (credentials are automatically loaded when needed)
 gh copilot
 # ? "Check server01"
 ```
 
 **How it works:**
-1. You run `$credential = Get-Credential` — Windows opens a secure login dialog
-2. You enter username/password in the dialog (never in the chat)
-3. You start `gh copilot` — the agent detects `$credential` and uses it automatically
-4. The credential persists for the lifetime of your PowerShell session
+1. You create the credential file one time using Export-Clixml
+2. Windows opens a secure login dialog — enter username/password there
+3. PowerShell encrypts the credentials using DPAPI (tied to your user + machine)
+4. The file is saved to `$HOME\.wininvestigator\credentials.xml`
+5. When you run `gh copilot`, the agent loads the saved credentials automatically when needed
+6. Only you on this machine can decrypt the file — it's not portable by design
 
-⚠️ **SECURITY: Never type passwords in the Copilot CLI chat.** Always create credentials before 
-starting Copilot using `$credential = Get-Credential`. Passwords typed in the conversation are 
-visible in plain text.
+⚠️ **SECURITY: Never type passwords in the Copilot CLI chat.** Always create credential files outside 
+of Copilot using Export-Clixml. The file contains encrypted data (DPAPI), not plain text passwords.
 
 ---
 
@@ -256,7 +260,7 @@ If this fails:
 ### 3. Admin Access
 
 - Your user must have local admin or equivalent rights on the target server
-- Or, you must be able to provide credentials for a user who does (create `$credential = Get-Credential` before running Copilot)
+- Or, you must be able to provide credentials for a user who does (save them with Export-Clixml before running Copilot)
 
 ### 4. Copilot CLI Installed
 

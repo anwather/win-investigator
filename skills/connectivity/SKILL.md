@@ -18,32 +18,66 @@ Test connectivity to a Windows Server and establish a PowerShell remoting sessio
 
 ⚠️ **SECURITY: NEVER ask users to type passwords in the chat.** Passwords are visible in plain text and stored in chat history.
 
-**The user must create the `$credential` variable BEFORE running Copilot CLI** (or when prompted):
-```powershell
-# User runs this in their PowerShell session:
-$credential = Get-Credential
-```
+**NEW APPROACH:** Credentials are saved to encrypted files using PowerShell's Export-Clixml/Import-Clixml. This uses DPAPI encryption, which ties the encrypted data to the current user and machine.
 
 **Default (current user):**
-For domain-joined machines accessing domain servers, no `$credential` variable is needed. The current user's identity is used automatically.
+For domain-joined machines accessing domain servers, no credential file is needed. The current user's identity is used automatically.
 
-**Explicit credentials (pre-created variable):**
-When explicit credentials are required (Azure VMs, cross-domain, workgroup servers), the agent checks for the `$credential` variable:
+**Explicit credentials (file-based encrypted storage):**
+
+ONE-TIME USER SETUP (before first use):
 ```powershell
-# Agent checks if credential exists
-if (-not $credential) {
-    Write-Host "⚠️ I need credentials to connect to $ServerName." -ForegroundColor Yellow
+# Create credentials directory
+New-Item -ItemType Directory -Path "$HOME\.wininvestigator" -Force
+
+# Save credentials to encrypted file (opens GUI dialog)
+Get-Credential | Export-Clixml -Path "$HOME\.wininvestigator\credentials.xml"
+```
+
+AGENT RUNTIME PATTERN:
+```powershell
+# Load saved credentials
+$credPath = Join-Path $HOME ".wininvestigator" "credentials.xml"
+if (Test-Path $credPath) {
+    $credential = Import-Clixml -Path $credPath
+} else {
+    Write-Host "⚠️ No saved credentials found." -ForegroundColor Yellow
     Write-Host ""
-    Write-Host "Please run this in your PowerShell session:" -ForegroundColor Cyan
-    Write-Host "  `$credential = Get-Credential" -ForegroundColor White
+    Write-Host "To save credentials for server connections, run:" -ForegroundColor Cyan
+    Write-Host '  New-Item -ItemType Directory -Path "$HOME\.wininvestigator" -Force' -ForegroundColor White
+    Write-Host '  Get-Credential | Export-Clixml -Path "$HOME\.wininvestigator\credentials.xml"' -ForegroundColor White
     Write-Host ""
-    Write-Host "Then ask me again and I'll connect using those credentials." -ForegroundColor Cyan
+    Write-Host "Then ask me again and I'll load the saved credentials." -ForegroundColor Cyan
     return
 }
 
-# Agent uses pre-created credential
+# Use loaded credential
 $SessionOption = New-PSSessionOption -SkipCACheck -SkipCNCheck
-$session = New-PSSession -ComputerName $ServerName -UseSSL -Port 5986 -Credential $credential -SessionOption $SessionOption
+$params = @{
+    ComputerName  = $ServerName
+    UseSSL        = $true
+    Port          = 5986
+    SessionOption = $SessionOption
+}
+if ($credential) { $params['Credential'] = $credential }
+$session = New-PSSession @params
+```
+
+**Server-specific credentials (multiple servers):**
+```powershell
+# Save server-specific credentials (user does this one time)
+Get-Credential | Export-Clixml -Path "$HOME\.wininvestigator\server01-cred.xml"
+
+# Agent checks for server-specific credential first, falls back to default
+$serverCredPath = Join-Path $HOME ".wininvestigator" "$ServerName-cred.xml"
+$defaultCredPath = Join-Path $HOME ".wininvestigator" "credentials.xml"
+
+if (Test-Path $serverCredPath) {
+    $credential = Import-Clixml -Path $serverCredPath
+} elseif (Test-Path $defaultCredPath) {
+    $credential = Import-Clixml -Path $defaultCredPath
+}
+# If neither exists, use current user (implicit credentials)
 ```
 
 ## Connection Pattern
@@ -93,14 +127,19 @@ try {
 ```powershell
 $ServerName = "TARGET_SERVER"  # Hostname or IP address
 
-# Check if explicit credentials needed
-if (-not $credential) {
-    Write-Host "⚠️ I need credentials to connect to $ServerName." -ForegroundColor Yellow
+# Load saved credentials (if file exists)
+$credPath = Join-Path $HOME ".wininvestigator" "credentials.xml"
+$credential = $null
+if (Test-Path $credPath) {
+    $credential = Import-Clixml -Path $credPath
+} else {
+    Write-Host "⚠️ No saved credentials found." -ForegroundColor Yellow
     Write-Host ""
-    Write-Host "Please run this in your PowerShell session:" -ForegroundColor Cyan
-    Write-Host "  `$credential = Get-Credential" -ForegroundColor White
+    Write-Host "To save credentials for server connections, run:" -ForegroundColor Cyan
+    Write-Host '  New-Item -ItemType Directory -Path "$HOME\.wininvestigator" -Force' -ForegroundColor White
+    Write-Host '  Get-Credential | Export-Clixml -Path "$HOME\.wininvestigator\credentials.xml"' -ForegroundColor White
     Write-Host ""
-    Write-Host "Then ask me again and I'll connect using those credentials." -ForegroundColor Cyan
+    Write-Host "Then ask me again and I'll load the saved credentials." -ForegroundColor Cyan
     return
 }
 
@@ -138,8 +177,8 @@ try {
     Write-Warning "✗ Connection failed: $($_.Exception.Message)"
 
     if ($_.Exception.Message -match "Access is denied") {
-        Write-Host "  → Verify `$credential variable exists and is correct" -ForegroundColor Yellow
-        Write-Host "  → User can create new credential: `$credential = Get-Credential" -ForegroundColor Yellow
+        Write-Host "  → Verify saved credentials are correct" -ForegroundColor Yellow
+        Write-Host "  → Re-create credential file if needed" -ForegroundColor Yellow
     } elseif ($_.Exception.Message -match "cannot be resolved") {
         Write-Host "  → Check DNS resolution and network connectivity" -ForegroundColor Yellow
     } elseif ($_.Exception.Message -match "certificate") {
@@ -154,8 +193,12 @@ try {
 ```powershell
 $ServerName = "TARGET_SERVER"
 
-# For current user (default): no credential needed
-# For explicit credentials: check if $credential variable exists
+# Load credentials if saved, otherwise use current user (implicit)
+$credPath = Join-Path $HOME ".wininvestigator" "credentials.xml"
+$credential = $null
+if (Test-Path $credPath) {
+    $credential = Import-Clixml -Path $credPath
+}
 
 $SessionOption = New-PSSessionOption -SkipCACheck -SkipCNCheck
 $invokeParams = @{
@@ -188,7 +231,12 @@ try {
 ```powershell
 $ServerName = "TARGET_SERVER"
 
-# Check for $credential variable if explicit auth needed
+# Load saved credentials if available
+$credPath = Join-Path $HOME ".wininvestigator" "credentials.xml"
+$credential = $null
+if (Test-Path $credPath) {
+    $credential = Import-Clixml -Path $credPath
+}
 
 try {
     $CimOption = New-CimSessionOption -UseSsl -SkipCACheck -SkipCNCheck
@@ -227,22 +275,23 @@ try {
 
 | Error Message | Likely Cause | Resolution |
 |--------------|--------------|------------|
-| "Access is denied" | Insufficient permissions or wrong credentials | Use account with local admin rights; verify credentials in Get-Credential dialog |
+| "Access is denied" | Insufficient permissions or wrong credentials | Use account with local admin rights; verify saved credential file or re-create |
 | "Cannot be resolved" | DNS/Name resolution | Check hostname, try IP address directly |
 | "WinRM cannot process the request" | WinRM HTTPS not configured | Configure WinRM HTTPS listener on target |
 | "Connection timed out" | Firewall/NSG blocking port 5986 | Check firewall and NSG inbound rules for TCP 5986 |
-| "Logon failure" | Bad credentials | Verify username/password entered in Get-Credential dialog |
+| "Logon failure" | Bad credentials | Re-create credential file with correct username/password |
 | "Server certificate invalid" | Certificate issue | Handled by -SkipCACheck and -SkipCNCheck |
-| "Negotiate authentication error" | Kerberos over internet | Use explicit -Credential parameter via Get-Credential |
+| "Negotiate authentication error" | Kerberos over internet | Use explicit credentials saved in credential file |
 
 ## Security Considerations
 
 1. **Always HTTPS** — All connections use port 5986 with SSL/TLS encryption
-2. **Never type passwords in chat** — Use `Get-Credential` which opens a secure Windows dialog for password entry
-3. **SkipCACheck / SkipCNCheck** — Bypasses certificate validation for self-signed certs; acceptable for known servers you control
-4. **IP addresses supported** — Connect directly to IPs without TrustedHosts modification
-5. **Credentials never stored** — PSCredential objects are used once and discarded
-6. **For production** — Consider CA-issued certificates and removing Skip flags
+2. **Encrypted credential storage** — Export-Clixml uses DPAPI encryption tied to user + machine
+3. **Never type passwords in chat** — User creates credential file outside of Copilot CLI
+4. **SkipCACheck / SkipCNCheck** — Bypasses certificate validation for self-signed certs; acceptable for known servers you control
+5. **IP addresses supported** — Connect directly to IPs without TrustedHosts modification
+6. **Credentials stored securely** — Encrypted files in `$HOME\.wininvestigator\`, not in the repo
+7. **For production** — Consider CA-issued certificates and removing Skip flags
 
 ## WinRM HTTPS Setup on Target
 
