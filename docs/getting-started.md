@@ -129,7 +129,26 @@ gh repo clone anwather/win-investigator
 cd win-investigator
 ```
 
-This creates a folder and copies all the agent instructions and diagnostic skills. 
+This creates a folder and copies all the agent instructions and diagnostic skills.
+
+---
+
+## Step 4.5: Run the Setup Script
+
+{: .important }
+> **Run this FIRST after cloning!** This removes development files you don't need as an end user.
+
+```powershell
+.\Setup.ps1
+```
+
+The setup script will:
+- Remove development artifacts (`.squad/` folder, GitHub Pages files, etc.)
+- Keep everything you need for investigations
+- Show you a summary of what was removed
+- Tell you the next steps
+
+After running the script, you'll have a clean installation ready to use.
 
 **No separate skill installation needed!** When you run `gh copilot` in this directory, the `.github/copilot-instructions.md` file is automatically loaded with all diagnostic skill PowerShell code embedded. Everything just works out of the box.
 

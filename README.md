@@ -62,9 +62,23 @@ gh repo clone anwather/win-investigator
 cd win-investigator
 ```
 
+### Step 4: Run the Setup Script
+
+**IMPORTANT: Run this FIRST after cloning.** This removes development files you don't need.
+
+```powershell
+.\Setup.ps1
+```
+
+The script will:
+- Remove development artifacts (`.squad/`, `docs/`, etc.)
+- Keep everything needed for investigations
+- Show you what was removed and what's left
+- Tell you the next steps
+
 **That's it!** All diagnostic skills are built-in and automatically loaded when you run `gh copilot` in this directory. No manual skill installation or configuration needed.
 
-### Step 4: Start Your First Investigation
+### Step 5: Start Your First Investigation
 
 ```bash
 gh copilot
