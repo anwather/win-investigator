@@ -234,6 +234,19 @@ Win-Investigator can run these focused checks based on your question. **Full inv
 
 ---
 
+## Automated Investigations (Advanced Feature)
+
+Want Win-Investigator to run automatically when Azure alerts fire? Configure it to trigger from Azure Monitor alerts via GitHub Actions:
+
+- 🚨 **Alert-triggered diagnostics** — Azure alert fires → GitHub creates issue with diagnostic results
+- 🔐 **Secure credential handling** — Server credentials stored in Azure Key Vault, never in GitHub
+- 🔑 **OIDC authentication** — GitHub Actions authenticates to Azure without long-lived secrets
+- 📊 **Same diagnostics** — Uses the same powerful skills as interactive mode
+
+**[Learn how to set up automated investigations →](docs/automation.md)**
+
+---
+
 ## Prerequisites Detail
 
 ### 1. PowerShell Remoting on Target Servers

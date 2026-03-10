@@ -273,6 +273,29 @@ gh copilot
 
 ---
 
+## Automated Investigations (Advanced)
+
+By default, Win-Investigator is interactive — you ask questions and get reports instantly. But you can also configure it to **run automatically from Azure Monitor alerts**.
+
+{: .note }
+> See [Automated Investigations]({{ site.baseurl }}/automation.md) for the complete guide to setting up alert-triggered diagnostics, credential handling via Azure Key Vault, and GitHub Actions integration.
+
+### When to Use Automation
+
+- **After-hours alerts** — Automatic diagnostics when your team is offline
+- **Proactive health checks** — Run on alert thresholds without manual intervention
+- **Fast escalation** — Alert → GitHub Issue → Team notification (all automated)
+- **Production systems** — Get diagnostics in seconds, not minutes
+
+### Prerequisites for Automation
+
+- Azure subscription with Azure Monitor
+- Azure Key Vault to store server credentials
+- GitHub Actions enabled in your repository
+- Azure AD OIDC federation configured (optional but recommended)
+
+---
+
 ## Limitations & When to Escalate
 
 {: .note }

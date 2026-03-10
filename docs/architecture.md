@@ -294,6 +294,42 @@ Win-Investigator uses PowerShell remoting (WinRM) because:
 
 ---
 
+## Automation
+
+While Win-Investigator is designed for **interactive use**, it can be extended to run **automatically from Azure Monitor alerts** via GitHub Actions.
+
+### Alert-Triggered Architecture
+
+```
+Azure Alert → Webhook → GitHub repository_dispatch Event
+  → GitHub Actions Workflow
+    → Authenticate to Azure (OIDC)
+    → Retrieve credentials from Key Vault
+    → Run diagnostics (same skills, same structured output)
+    → Create GitHub Issue with findings
+```
+
+### Key Differences from Interactive Mode
+
+| Aspect | Interactive | Automated |
+|--------|-------------|-----------|
+| **Trigger** | User question (Copilot CLI) | Azure Monitor alert |
+| **Credentials** | DPAPI file or current user | Azure Key Vault + OIDC |
+| **Output** | CLI report | GitHub Issue + comments |
+| **Execution** | Immediate | Workflow job (typically <5 min) |
+| **Auditing** | PowerShell history | GitHub Actions logs + Azure AD logs |
+
+### Prerequisites for Automation
+
+- Azure Key Vault (to store server credentials)
+- Azure AD app registration + OIDC federation (for secure authentication)
+- GitHub Actions enabled + workflow file
+- Azure Monitor alert rules + Action Group
+
+See [Automated Investigations]({{ site.baseurl }}/automation.md) for the complete setup guide, including step-by-step configuration and example workflows.
+
+---
+
 ## Project Structure
 
 ```
