@@ -71,7 +71,7 @@ All three core agents completed work successfully. Architecture is stable, diagn
 - 7 content pages: Home (index), Getting Started, Usage Guide, Diagnostics Reference, Examples, Troubleshooting, Architecture
 - Jekyll config with search enabled, dark color scheme, back-to-top, GitHub aux links
 - Gemfile and .gitignore for local Jekyll development
-- GitHub Actions workflow (`.github/workflows/pages.yml`) for automatic deployment from `master` branch
+- GitHub Actions workflow (`.github/workflows/pages.yml`) for automatic deployment from `main` branch
 
 **Content strategy:**
 - Redistributed README.md content across purpose-built pages (not copy-paste — restructured for web)

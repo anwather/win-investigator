@@ -337,7 +337,7 @@ az ad app federated-credential create \
   --parameters '{
     "name": "github-actions-credential",
     "issuer": "https://token.actions.githubusercontent.com",
-    "subject": "repo:'"$GITHUB_OWNER"'/'"$GITHUB_REPO"':ref:refs/heads/master",
+    "subject": "repo:'"$GITHUB_OWNER"'/'"$GITHUB_REPO"':ref:refs/heads/main",
     "audiences": ["api://AzureADTokenExchange"]
   }'
 
@@ -885,7 +885,7 @@ az role assignment create --role "Key Vault Secrets User" \
 az ad app federated-credential create --id $APP_ID --parameters '{
   "name": "github-actions",
   "issuer": "https://token.actions.githubusercontent.com",
-  "subject": "repo:anwather/win-investigator:ref:refs/heads/master",
+  "subject": "repo:anwather/win-investigator:ref:refs/heads/main",
   "audiences": ["api://AzureADTokenExchange"]
 }'
 
