@@ -162,7 +162,7 @@ Test-WSMan server01 -UseSSL -Port 5986 -SkipCACheck -SkipCNCheck
 ### Admin Rights on Target Servers
 
 - Your user must have **local administrator** rights on the target, OR
-- You can provide **different credentials** when asking (see Usage section below)
+- You can provide **different credentials** when asking (create `$credential = Get-Credential` before running Copilot)
 
 ### GitHub Account
 
@@ -183,40 +183,30 @@ gh copilot
 # Uses: your-domain\your-user (automatically)
 ```
 
-### Explicit Credentials (Secure Dialog)
+### Explicit Credentials (Pre-created Variable)
 
-If you need different credentials (e.g., a dedicated admin account), Win-Investigator will open 
-a **secure Windows login dialog**:
-
-```bash
-gh copilot
-? "Check server01 with domain\admin credentials"
-
-# Windows opens a secure credential dialog (GUI)
-# You enter username/password in the dialog, NOT in the chat
-# Password is never visible in the conversation
-```
-
-**How the secure dialog works:**
-1. Agent runs `Get-Credential`
-2. Windows shows a login dialog box (GUI popup)
-3. You type username and password in the dialog
-4. Password is hidden and never appears in chat history
-
-⚠️ **SECURITY: Never type passwords in the Copilot CLI chat.** Passwords typed in the conversation 
-are visible in plain text. Always use the Get-Credential dialog for secure password entry.
-
-**Important:** Credentials are **never stored**. They are used only for that check and then discarded.
-
-### Pre-stored Credentials (Optional)
-
-For frequently accessed servers, you can pre-store credentials using Windows Credential Manager:
+If you need different credentials (e.g., a dedicated admin account), create the `$credential`
+variable **before** starting Copilot:
 
 ```powershell
-# One-time setup (run in PowerShell, outside Copilot):
-Install-Module -Name CredentialManager -Force
-New-StoredCredential -Target "server01" -UserName "domain\admin" -SecurePassword (Read-Host -AsSecureString)
+# Step 1: Create the credential in your PowerShell session
+$credential = Get-Credential
+# A secure Windows dialog opens — enter username and password there
+
+# Step 2: Start Copilot (credential is automatically available)
+gh copilot
+# ? "Check server01"
 ```
+
+**How it works:**
+1. You run `$credential = Get-Credential` — Windows opens a secure login dialog
+2. You enter username/password in the dialog (never in the chat)
+3. You start `gh copilot` — the agent detects `$credential` and uses it automatically
+4. The credential persists for the lifetime of your PowerShell session
+
+⚠️ **SECURITY: Never type passwords in the Copilot CLI chat.** Always create credentials before 
+starting Copilot using `$credential = Get-Credential`. Passwords typed in the conversation are 
+visible in plain text.
 
 ---
 
@@ -266,7 +256,7 @@ If this fails:
 ### 3. Admin Access
 
 - Your user must have local admin or equivalent rights on the target server
-- Or, you must be able to provide credentials for a user who does (use explicit credentials mode)
+- Or, you must be able to provide credentials for a user who does (create `$credential = Get-Credential` before running Copilot)
 
 ### 4. Copilot CLI Installed
 

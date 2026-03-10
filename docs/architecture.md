@@ -97,31 +97,30 @@ Each diagnostic area is an independent skill with:
 - Structured PSObject return values (not formatted text)
 - Error handling and fallback logic
 
-### Credentials as Parameters
+### Credentials as Pre-created Variables
 
-Credentials are **never stored**. They flow through the system as parameters:
+Credentials are **never created inline** by the agent. The user creates a `$credential` variable
+in their PowerShell session before starting `gh copilot`, and the agent uses it if present:
 
 ```
-User specifies credentials are needed
-  → Agent runs Get-Credential (opens secure Windows login dialog)
+User creates $credential in PowerShell session:
+  → $credential = Get-Credential (opens secure Windows login dialog)
     → User enters username/password in GUI dialog (NOT in chat)
-      → Agent receives PSCredential object
-        → Agent passes to PowerShell skill via -Credential parameter
-          → Skill uses for Invoke-Command -Credential
-            → Credential is discarded after the session ends
+      → User starts gh copilot
+        → Agent checks: if (-not $credential) { tell user to create it }
+          → Agent uses: if ($credential) { $params['Credential'] = $credential }
+            → Skill uses for Invoke-Command -Credential
+              → Credential persists for the PowerShell session lifetime
 ```
 
 **Security principles:**
 - Passwords are NEVER typed in the Copilot CLI chat
-- Get-Credential opens a Windows GUI dialog for secure entry
+- The agent NEVER runs Get-Credential inline — the user creates it beforehand
+- `$credential = Get-Credential` opens a secure Windows GUI dialog
 - Passwords are never visible in conversation history
 - PSCredential objects are never logged or displayed
-- Credentials are used only for the current operation, then discarded
-
-**Alternative: Pre-stored credentials**
-- Users can optionally pre-store credentials in Windows Credential Manager
-- Agent retrieves them with `Get-StoredCredential` (no prompting needed)
-- Useful for frequently accessed servers
+- If `$credential` is not set, the agent tells the user:
+  "Please run this in your PowerShell session: `$credential = Get-Credential`"
 
 ---
 
@@ -135,13 +134,13 @@ The agent analyzes the question to extract:
 - **Target server** — hostname or IP address
 - **Concern area** — disk, memory, services, network, general, etc.
 - **Urgency signals** — "critical", "down", "not working", "slow"
-- **Credential mode** — current user (default) or explicit
+- **Credential mode** — current user (default) or pre-created `$credential` variable
 
 ### 2. Connect
 
 The agent establishes a connection:
 - Tests connectivity (ping + WinRM)
-- Authenticates with current user or provided credentials
+- Authenticates with current user or pre-created `$credential` variable
 - Handles connection errors with specific guidance
 
 ### 3. Diagnose
@@ -247,7 +246,7 @@ Key conventions:
 - **CIM over WMI** — `Get-CimInstance` not `Get-WmiObject`
 - **Structured returns** — PSObjects, not formatted text
 - **Error handling** — try/catch with meaningful error messages
-- **Credential flow** — Optional `$Credential` parameter, null for current user
+- **Credential flow** — Optional `$credential` parameter; user creates it before running `gh copilot`, null for current user. Agent NEVER runs Get-Credential inline.
 
 ---
 

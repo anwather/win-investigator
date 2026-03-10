@@ -12,8 +12,8 @@ description: "Fixes for common setup and connection issues. Start here if someth
 {: .fs-6 .fw-300 }
 
 {: .important }
-> **Security Note:** Never type passwords in the Copilot CLI chat. Always use Get-Credential which opens 
-> a secure Windows dialog for password entry. Passwords typed in chat are visible in plain text.
+> **Security Note:** Never type passwords in the Copilot CLI chat. Always create your credential 
+> in PowerShell **before** running `gh copilot`: `$credential = Get-Credential`
 
 ## Table of contents
 {: .no_toc .text-delta }
@@ -115,53 +115,74 @@ gh extension list
 
 ## Credential Issues
 
-### Get-Credential dialog doesn't appear
+### `$credential` variable not found
 
-**Problem:** Agent says "Opening credential dialog" but nothing shows up.
+**Problem:** The agent says `$credential` is not defined, or asks you to create it.
 
-**Cause:** The dialog may be appearing behind other windows or off-screen.
+**Cause:** You need to create the `$credential` variable in your PowerShell session **before** running `gh copilot`.
 
 **Solution:**
 
-1. **Check the taskbar** — Look for a blinking PowerShell or Windows Security icon
-2. **Alt+Tab** to cycle through windows — The dialog may be hidden behind your browser
-3. **Click the PowerShell window** in the taskbar to bring it to focus
-4. **Check for multiple monitors** — The dialog may have opened on a different screen
-5. **Restart the session** — Close and reopen `gh copilot`, then try again
+Run this in your PowerShell session (not inside Copilot chat):
+
+```powershell
+$credential = Get-Credential
+```
+
+A secure Windows dialog will open. Enter your username and password there, then start Copilot:
+
+```powershell
+gh copilot
+```
+
+The agent will automatically detect and use the `$credential` variable for remote connections.
+
+{: .note }
+> The `$credential` variable persists for the lifetime of your PowerShell session. You only need to set it once per session.
 
 ### Credentials keep being asked for the same server
 
-**Problem:** Every time you check the same server, Get-Credential opens again.
+**Problem:** Every investigation requires you to create `$credential` again.
 
-**Cause:** Credentials are not stored between checks (by design for security).
+**Cause:** The `$credential` variable only lasts for the current PowerShell session. If you close and reopen PowerShell, you need to set it again.
 
 **Solution:**
 
-Use Windows Credential Manager to pre-store credentials for frequently accessed servers:
+Set `$credential` once at the start of your PowerShell session, then run as many `gh copilot` investigations as you need:
 
 ```powershell
-# One-time setup (run in PowerShell, not in Copilot chat):
-Install-Module -Name CredentialManager -Force
-New-StoredCredential -Target "server01" -UserName "domain\admin" -SecurePassword (Read-Host -AsSecureString "Password")
+# Set once per session (before running gh copilot):
+$credential = Get-Credential
+
+# Now run Copilot — credentials are reused automatically:
+gh copilot
+# ? "Check server01"
+# ? "Check server02"
+# ? "Check server03"
 ```
 
-Then Win-Investigator can retrieve them without prompting.
+If you open a new PowerShell window, run `$credential = Get-Credential` again before starting Copilot.
 
 ### "Wrong username or password"
 
-**Problem:** Get-Credential dialog opens, you enter credentials, but connection fails with "Access denied".
+**Problem:** You created `$credential` but connections fail with "Access denied".
 
 **Solution:**
 
-1. **Verify the username format** is correct:
+1. **Verify the username format** when creating `$credential`:
    - Domain account: `domain\username` or `username@domain.com`
    - Local account: `.\username` or `ServerName\username`
    - Azure VM local: `VMName\AdminUser`
    - Azure VM with Azure AD: `user@domain.com`
 
-2. **Check Caps Lock** is off when typing password
+   ```powershell
+   # Re-create with the correct username format:
+   $credential = Get-Credential
+   ```
 
-3. **Try entering credentials again** — Run the check again and be careful with the password
+2. **Check Caps Lock** is off when typing password in the credential dialog
+
+3. **Re-create the credential** — Run `$credential = Get-Credential` again and be careful with the password
 
 4. **Verify the account is not locked**:
    ```powershell
@@ -276,13 +297,18 @@ net localgroup Administrators domain\username /add
 
 **Solution 2: Use explicit credentials**
 
-When Win-Investigator asks, use different credentials:
+Create a `$credential` variable before starting Copilot:
+
+```powershell
+$credential = Get-Credential
+gh copilot
+```
 
 ```
-? "Check server01 with domain\admin credentials"
+? "Check server01"
 ```
 
-It will prompt for a password. Enter it and press Enter.
+The agent will automatically use the `$credential` for the connection.
 
 ---
 

@@ -114,45 +114,41 @@ By default, Win-Investigator uses your Windows user account. If you have admin a
 
 No password prompt. It just works.
 
-### Explicit Credentials (Secure Dialog)
+### Explicit Credentials (Pre-created Variable)
 
-If you need to use a different account (e.g., a dedicated admin account):
-
-```
-? "Check server01 with domain\admin credentials"
-```
-
-Win-Investigator will run `Get-Credential`, which **opens a secure Windows login dialog**:
-
-1. A Windows credential prompt appears (GUI window)
-2. You enter username and password in the dialog
-3. The password is hidden (dots) and never appears in the chat
-4. The agent uses the credential for that connection only
-
-**What the dialog looks like:**
-- Standard Windows credential input box
-- Title: "Windows PowerShell credential request"  
-- Message: "Enter credentials for server01" (or similar)
-- Username field (may be pre-filled)
-- Password field (shows dots, not text)
-
-⚠️ **SECURITY: Never type passwords in the Copilot CLI chat.** Always use the Get-Credential 
-dialog. Passwords typed in chat are visible in plain text and stored in history.
-
-**Important:** Credentials are used only for that one check. They are **never stored or reused** 
-after the session ends.
-
-### Pre-stored Credentials (Optional)
-
-For servers you access frequently, you can pre-store credentials using Windows Credential Manager:
+If you need to use a different account (e.g., a dedicated admin account), create the `$credential`
+variable in your PowerShell session **before** running `gh copilot`:
 
 ```powershell
-# One-time setup (run in PowerShell, outside Copilot):
-Install-Module -Name CredentialManager -Force
-New-StoredCredential -Target "server01" -UserName "domain\admin" -SecurePassword (Read-Host -AsSecureString)
+# Step 1: Create the credential (in PowerShell, before starting Copilot)
+$credential = Get-Credential
+
+# A secure Windows dialog opens — enter username and password there
+
+# Step 2: Start Copilot (credential is automatically available)
+gh copilot
 ```
 
-The agent can then retrieve these without prompting. This is useful for automation or repeated checks.
+Then just ask your question — the agent detects `$credential` and uses it automatically:
+
+```
+? "Check server01"
+```
+
+**How it works:**
+1. You run `$credential = Get-Credential` — Windows opens a secure login dialog
+2. You enter username/password in the dialog (password is hidden, never visible in chat)
+3. You start `gh copilot` — the agent checks for the `$credential` variable
+4. If found, the agent uses it for all remote connections
+5. If not found, the agent tells you to create it
+
+⚠️ **SECURITY: Never type passwords in the Copilot CLI chat.** Always create credentials 
+using `$credential = Get-Credential` before starting Copilot. Passwords typed in chat are 
+visible in plain text and stored in history.
+
+**Important:** The `$credential` variable lasts for the lifetime of your PowerShell session. 
+You can run multiple investigations without re-entering credentials. If you close PowerShell, 
+run `$credential = Get-Credential` again in the new session.
 
 ---
 
@@ -231,10 +227,15 @@ Next steps: Clean temp, then monitor memory.             ← What to do next
 
 ### Q: What if I don't have admin access to a server?
 
-**A:** Use explicit credentials to log in as a user who does:
+**A:** Create a credential for a user who does, then start Copilot:
+
+```powershell
+$credential = Get-Credential
+gh copilot
+```
 
 ```
-? "Check server01 with domain\admin credentials"
+? "Check server01"
 ```
 
 ### Q: How long do checks usually take?

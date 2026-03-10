@@ -60,7 +60,7 @@ Report to User
 
 **Credential-aware:**
 - Default: Use current user (implicit)
-- Explicit: "Check server01 with domain\admin credentials" → Prompt for password
+- Explicit: User creates `$credential = Get-Credential` before running `gh copilot` → agent detects and uses it
 
 ---
 
@@ -91,18 +91,27 @@ Supports hostnames and IP addresses directly.
 Uses New-CimSession or Invoke-Command with implicit credentials.
 ```
 
-### Explicit Credentials
+### Explicit Credentials (Pre-created Variable)
 ```
-User provides: "Check server01 with domain\admin credentials"
-Agent runs: $cred = Get-Credential -Message "Enter credentials for server01"
-Windows opens a secure login dialog (GUI).
-User enters username/password in the dialog (NOT in chat).
-Agent uses $cred in -Credential parameter.
+User creates $credential BEFORE running gh copilot:
+  $credential = Get-Credential   (in their PowerShell session)
+  gh copilot                      (start Copilot — $credential is available)
+
+Agent checks for $credential:
+  if (-not $credential) {
+    → Tell user: "Please run this in your PowerShell session: $credential = Get-Credential"
+  }
+  if ($credential) {
+    → $params['Credential'] = $credential
+  }
+
+Agent NEVER runs Get-Credential inline.
 Password never appears in conversation.
+$credential persists for the PowerShell session lifetime.
 ```
 
-⚠️ **SECURITY:** Never ask the user to type a password in the chat. Always use Get-Credential 
-which opens a secure Windows dialog.
+⚠️ **SECURITY:** Never ask the user to type a password in the chat. Never run Get-Credential 
+inline. Always instruct the user to create `$credential` before starting Copilot.
 
 ### Connection Transport
 ```
