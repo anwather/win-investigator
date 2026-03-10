@@ -114,23 +114,45 @@ By default, Win-Investigator uses your Windows user account. If you have admin a
 
 No password prompt. It just works.
 
-### Explicit Credentials (Different User)
+### Explicit Credentials (Secure Dialog)
 
-If you need to use a different account (e.g., a dedicated admin):
+If you need to use a different account (e.g., a dedicated admin account):
 
 ```
 ? "Check server01 with domain\admin credentials"
 ```
 
-Win-Investigator will prompt:
+Win-Investigator will run `Get-Credential`, which **opens a secure Windows login dialog**:
 
+1. A Windows credential prompt appears (GUI window)
+2. You enter username and password in the dialog
+3. The password is hidden (dots) and never appears in the chat
+4. The agent uses the credential for that connection only
+
+**What the dialog looks like:**
+- Standard Windows credential input box
+- Title: "Windows PowerShell credential request"  
+- Message: "Enter credentials for server01" (or similar)
+- Username field (may be pre-filled)
+- Password field (shows dots, not text)
+
+⚠️ **SECURITY: Never type passwords in the Copilot CLI chat.** Always use the Get-Credential 
+dialog. Passwords typed in chat are visible in plain text and stored in history.
+
+**Important:** Credentials are used only for that one check. They are **never stored or reused** 
+after the session ends.
+
+### Pre-stored Credentials (Optional)
+
+For servers you access frequently, you can pre-store credentials using Windows Credential Manager:
+
+```powershell
+# One-time setup (run in PowerShell, outside Copilot):
+Install-Module -Name CredentialManager -Force
+New-StoredCredential -Target "server01" -UserName "domain\admin" -SecurePassword (Read-Host -AsSecureString)
 ```
-Enter password for domain\admin:
-```
 
-Type the password (it won't echo on screen) and press Enter.
-
-**Important:** Credentials are used only for that one check. They are **never stored or reused**.
+The agent can then retrieve these without prompting. This is useful for automation or repeated checks.
 
 ---
 

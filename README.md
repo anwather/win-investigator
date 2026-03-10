@@ -181,20 +181,40 @@ gh copilot
 # Uses: your-domain\your-user (automatically)
 ```
 
-### Explicit Credentials (If Needed)
+### Explicit Credentials (Secure Dialog)
 
-If you need different credentials (e.g., a dedicated admin account):
+If you need different credentials (e.g., a dedicated admin account), Win-Investigator will open 
+a **secure Windows login dialog**:
 
 ```bash
 gh copilot
 ? "Check server01 with domain\admin credentials"
 
-# The agent will prompt: "Enter password for domain\admin:"
-# Type your password (it won't echo) and press Enter
-# Uses: domain\admin for this check
+# Windows opens a secure credential dialog (GUI)
+# You enter username/password in the dialog, NOT in the chat
+# Password is never visible in the conversation
 ```
 
+**How the secure dialog works:**
+1. Agent runs `Get-Credential`
+2. Windows shows a login dialog box (GUI popup)
+3. You type username and password in the dialog
+4. Password is hidden and never appears in chat history
+
+⚠️ **SECURITY: Never type passwords in the Copilot CLI chat.** Passwords typed in the conversation 
+are visible in plain text. Always use the Get-Credential dialog for secure password entry.
+
 **Important:** Credentials are **never stored**. They are used only for that check and then discarded.
+
+### Pre-stored Credentials (Optional)
+
+For frequently accessed servers, you can pre-store credentials using Windows Credential Manager:
+
+```powershell
+# One-time setup (run in PowerShell, outside Copilot):
+Install-Module -Name CredentialManager -Force
+New-StoredCredential -Target "server01" -UserName "domain\admin" -SecurePassword (Read-Host -AsSecureString)
+```
 
 ---
 

@@ -138,3 +138,55 @@ $result = Invoke-Command @invokeParams
 **Outcome:** SUCCESS
 
 All connection patterns across 14+ files now use HTTPS/5986 with SkipCACheck/SkipCNCheck. Azure connectivity skill is integrated and production-ready. Standardization eliminates all branching complexity. All diagnostics now route through the same secure connection pipeline.
+
+---
+
+### Secure Credential Handling Implemented (Current Session)
+
+**Context:** Security vulnerability identified — passwords typed in Copilot CLI chat are visible in plain text and stored in chat history.
+
+**Solution Implemented:** Comprehensive credential security overhaul across ALL files.
+
+**Primary Method: Get-Credential (Secure GUI Dialog)**
+- Agent runs `Get-Credential` which opens a Windows login dialog
+- User enters username/password in the GUI dialog, NOT in chat
+- Password is never visible in conversation history
+- PSCredential object is used in -Credential parameter
+- Credential is discarded after use
+
+**Alternative Method: Windows Credential Manager**
+- For frequently accessed servers
+- Users pre-store credentials outside of Copilot
+- Agent retrieves with `Get-StoredCredential`
+- No prompting needed for repeat connections
+
+**Files Updated (10 total):**
+1. `.github/copilot-instructions.md` — Complete rewrite of "Credential Handling" section with security warnings, Get-Credential flow, credential dialog explanation
+2. `.github/agents/win-investigator.md` — Updated explicit credentials section with security warning
+3. `skills/connectivity/SKILL.md` — Added credential handling section, security warnings in error table
+4. `skills/azure-connectivity/SKILL.md` — Updated all credential examples to use Get-Credential with security notes
+5. `README.md` — Rewrote credentials section with secure dialog explanation and security warning
+6. `docs/getting-started.md` — Added comprehensive "Setting Up Credentials" section with dialog description
+7. `docs/usage.md` — Rewrote credentials section with secure dialog explanation
+8. `docs/troubleshooting.md` — Added credential issues section (dialog not appearing, repeated prompts, wrong username)
+9. `docs/architecture.md` — Updated "Credentials as Parameters" with security principles
+10. All other skill files verified — already use `$Credential = $null` pattern correctly
+
+**Key Patterns Established:**
+```powershell
+# For explicit credentials (CORRECT):
+$cred = Get-Credential -Message "Enter credentials for ServerName"
+$session = New-PSSession -ComputerName $ServerName -Credential $cred ...
+
+# For current user (default):
+$Credential = $null
+if ($Credential) { $params['Credential'] = $Credential }
+```
+
+**NEVER Do These (explicitly documented):**
+- Never ask "what is your password?" in chat
+- Never use `ConvertTo-SecureString "PlainText" -AsPlainText`
+- Never display or log credential objects
+- Never accept passwords typed in conversation
+
+**Outcome:** All credential handling is now secure. Passwords can never appear in chat history. Users enter credentials via Windows GUI dialog or pre-store them in Credential Manager.

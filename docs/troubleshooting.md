@@ -11,6 +11,10 @@ description: "Fixes for common setup and connection issues. Start here if someth
 **Something not working?** We've got solutions.
 {: .fs-6 .fw-300 }
 
+{: .important }
+> **Security Note:** Never type passwords in the Copilot CLI chat. Always use Get-Credential which opens 
+> a secure Windows dialog for password entry. Passwords typed in chat are visible in plain text.
+
 ## Table of contents
 {: .no_toc .text-delta }
 
@@ -106,6 +110,66 @@ gh extension list
    ```bash
    gh extension install github/gh-copilot
    ```
+
+---
+
+## Credential Issues
+
+### Get-Credential dialog doesn't appear
+
+**Problem:** Agent says "Opening credential dialog" but nothing shows up.
+
+**Cause:** The dialog may be appearing behind other windows or off-screen.
+
+**Solution:**
+
+1. **Check the taskbar** — Look for a blinking PowerShell or Windows Security icon
+2. **Alt+Tab** to cycle through windows — The dialog may be hidden behind your browser
+3. **Click the PowerShell window** in the taskbar to bring it to focus
+4. **Check for multiple monitors** — The dialog may have opened on a different screen
+5. **Restart the session** — Close and reopen `gh copilot`, then try again
+
+### Credentials keep being asked for the same server
+
+**Problem:** Every time you check the same server, Get-Credential opens again.
+
+**Cause:** Credentials are not stored between checks (by design for security).
+
+**Solution:**
+
+Use Windows Credential Manager to pre-store credentials for frequently accessed servers:
+
+```powershell
+# One-time setup (run in PowerShell, not in Copilot chat):
+Install-Module -Name CredentialManager -Force
+New-StoredCredential -Target "server01" -UserName "domain\admin" -SecurePassword (Read-Host -AsSecureString "Password")
+```
+
+Then Win-Investigator can retrieve them without prompting.
+
+### "Wrong username or password"
+
+**Problem:** Get-Credential dialog opens, you enter credentials, but connection fails with "Access denied".
+
+**Solution:**
+
+1. **Verify the username format** is correct:
+   - Domain account: `domain\username` or `username@domain.com`
+   - Local account: `.\username` or `ServerName\username`
+   - Azure VM local: `VMName\AdminUser`
+   - Azure VM with Azure AD: `user@domain.com`
+
+2. **Check Caps Lock** is off when typing password
+
+3. **Try entering credentials again** — Run the check again and be careful with the password
+
+4. **Verify the account is not locked**:
+   ```powershell
+   # On domain controller:
+   Get-ADUser username -Properties LockedOut
+   ```
+
+5. **Check the account has admin rights** on the target server
 
 ---
 

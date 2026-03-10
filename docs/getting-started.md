@@ -174,6 +174,60 @@ If this fails, see the [Troubleshooting](#troubleshooting) section below.
 
 ---
 
+## Setting Up Credentials
+
+Win-Investigator needs credentials to connect to your servers. There are three approaches:
+
+### Default: Current User (No Setup Needed)
+
+If your Windows machine is domain-joined and you have admin rights on the target servers, 
+**no credential setup is needed**. Win-Investigator uses your current user identity automatically.
+
+```
+User: "What is going on with server01?"
+→ Connects using your current Windows identity (seamless)
+```
+
+### Explicit: Secure Login Dialog (Recommended for Azure VMs)
+
+When connecting to servers where you need different credentials (like Azure VMs or cross-domain servers), 
+Win-Investigator will run `Get-Credential` which **opens a Windows login dialog**:
+
+1. The agent says: "Opening credential dialog for server01..."
+2. A Windows login box appears on your screen
+3. You enter username and password in the dialog
+4. The password is entered securely — **never visible in the chat**
+
+**What it looks like:**
+- A standard Windows credential prompt window pops up
+- Title: "Windows PowerShell credential request"
+- Fields: Username (pre-filled if provided) and Password (hidden dots)
+- You type the password there, NOT in the Copilot chat
+
+**This is the PRIMARY method** for entering credentials securely.
+
+### Pre-stored: Windows Credential Manager (For Frequent Connections)
+
+If you connect to the same servers repeatedly, you can pre-store credentials:
+
+```powershell
+# One-time setup (run this yourself in PowerShell, outside of Copilot):
+Install-Module -Name CredentialManager -Force
+New-StoredCredential -Target "server01" -UserName "domain\admin" -SecurePassword (Read-Host -AsSecureString "Password")
+```
+
+Then the agent can retrieve stored credentials without prompting:
+```powershell
+# Agent retrieves pre-stored credentials
+$cred = Get-StoredCredential -Target "server01"
+```
+
+⚠️ **IMPORTANT SECURITY NOTE:** Never type passwords in the Copilot CLI chat. Passwords typed 
+in the conversation are visible in plain text and stored in chat history. Always use Get-Credential 
+(which opens a GUI dialog) or pre-store credentials with Credential Manager.
+
+---
+
 ## Verify Your Setup
 
 Before your first investigation, run these checks to make sure everything is ready:

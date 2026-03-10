@@ -23,8 +23,12 @@ Establish PowerShell remoting sessions to Azure VMs accessed via public IP addre
 
 ### On the Client Machine (your workstation)
 
-1. **Explicit credentials** ready (no implicit Kerberos over public IP)
+1. **Explicit credentials ready** — Kerberos does not work over public IP, so you'll use `Get-Credential` 
+   to open a secure Windows login dialog where the password is entered safely (NOT typed in chat)
 2. No TrustedHosts modification needed — `-SkipCACheck` and `-SkipCNCheck` handle certificate validation
+
+⚠️ **SECURITY: NEVER ask users to type Azure VM passwords in the chat.** Always use `Get-Credential` 
+which opens a secure GUI dialog.
 
 ---
 
@@ -125,6 +129,8 @@ try {
 
 ```powershell
 $ServerName = "20.100.50.25"  # Azure VM public IP or hostname
+
+# Open secure credential dialog (NEVER type password in chat)
 $Credential = Get-Credential -Message "Enter credentials for Azure VM at $ServerName"
 
 $SessionOption = New-PSSessionOption -SkipCACheck -SkipCNCheck
@@ -159,7 +165,8 @@ try {
     Write-Warning "✗ PSSession failed: $($_.Exception.Message)"
 
     if ($_.Exception.Message -match "Access is denied") {
-        Write-Host "  → Verify credentials (username format: VM_NAME\AdminUser or user@domain.com)" -ForegroundColor Yellow
+        Write-Host "  → Verify credentials in the Get-Credential dialog" -ForegroundColor Yellow
+        Write-Host "  → Username format: VM_NAME\AdminUser or user@domain.com" -ForegroundColor Yellow
     } elseif ($_.Exception.Message -match "cannot connect") {
         Write-Host "  → Check NSG, firewall, and WinRM HTTPS listener" -ForegroundColor Yellow
     } elseif ($_.Exception.Message -match "certificate") {
@@ -179,6 +186,8 @@ CIM sessions are used by many diagnostic skills (`Get-CimInstance`).
 
 ```powershell
 $ServerName = "20.100.50.25"
+
+# Open secure credential dialog
 $Credential = Get-Credential -Message "Enter credentials for Azure VM at $ServerName"
 
 try {
@@ -201,6 +210,7 @@ try {
     Write-Warning "✗ CIM session failed: $($_.Exception.Message)"
     Write-Host "  → Ensure WinRM HTTPS listener is configured on port 5986" -ForegroundColor Yellow
     Write-Host "  → Verify NSG allows TCP 5986 from your IP" -ForegroundColor Yellow
+    Write-Host "  → Verify credentials in Get-Credential dialog were correct" -ForegroundColor Yellow
 } finally {
     # Clean up when done
     # if ($cimSession) { Remove-CimSession -CimSession $cimSession }
@@ -215,11 +225,11 @@ try {
 |---|---|---|
 | Connection timed out / no response | NSG blocking port 5986 | Add NSG inbound rule for TCP 5986 |
 | "The server certificate on the destination computer has errors" | Self-signed cert | Handled by `-SkipCACheck -SkipCNCheck` in session options |
-| "Access is denied" | Wrong credentials or username format | Use `VM_NAME\AdminUser` format, not `domain\user` |
+| "Access is denied" | Wrong credentials or username format | Verify credentials entered in Get-Credential dialog; use `VM_NAME\AdminUser` or `user@domain.com` |
 | "WinRM cannot complete the operation" | WinRM HTTPS listener not configured | Configure listener on the VM (Step 2) |
 | "The connection to the specified remote host was refused" | WinRM service stopped or wrong port | Verify WinRM service is running, listener on 5986 |
 | "Cannot find the computer" | DNS resolution failure | Verify IP address, try direct IP instead of hostname |
-| "Negotiate authentication error" | Kerberos attempted over public IP | Ensure explicit credentials are provided |
+| "Negotiate authentication error" | Kerberos attempted over public IP | Ensure explicit credentials via Get-Credential |
 
 ---
 
@@ -260,11 +270,12 @@ az vm run-command invoke `
 ## Security Considerations
 
 1. **Always use HTTPS** (port 5986) for Azure VMs over public IP — HTTP sends credentials in clear text
-2. **Explicit credentials only** — Kerberos does not work over public IP without domain trust
-3. **Restrict NSG source IP** — Never allow `*` (any) as source for port 5986
-4. **Self-signed certs are acceptable** for known VMs you control, but CA-issued certs are preferred for production
-5. **Remove NSG rules** when remoting is no longer needed — minimize attack surface
-6. **Consider Azure Bastion** as a more secure alternative for ongoing management
+2. **Use Get-Credential for passwords** — Never type passwords in the chat; always use the secure Windows login dialog
+3. **Explicit credentials required** — Kerberos does not work over public IP without domain trust
+4. **Restrict NSG source IP** — Never allow `*` (any) as source for port 5986
+5. **Self-signed certs are acceptable** for known VMs you control, but CA-issued certs are preferred for production
+6. **Remove NSG rules** when remoting is no longer needed — minimize attack surface
+7. **Consider Azure Bastion** as a more secure alternative for ongoing management
 
 ---
 

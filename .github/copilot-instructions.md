@@ -158,33 +158,99 @@ When running a skill, provide context from the user's question and let the skill
 
 ## Credential Handling
 
-### Default Behavior (Current User)
+⚠️ **SECURITY: NEVER ask the user to type a password in this chat.** Passwords typed in the 
+conversation are visible in plain text and stored in chat history. This is a critical security risk.
+
+### How Credentials Work
+
+When the user needs to provide credentials (e.g., for Azure VMs or cross-domain servers):
+
+1. Run `Get-Credential` — this opens a **secure Windows login dialog**
+2. The user enters their username and password in the dialog (NOT in the chat)
+3. The dialog returns a PSCredential object that you use in commands
+4. The password is never visible in the conversation
+
+### Default: Current User (No Prompt)
+
+For domain-joined machines accessing domain servers, no credentials are needed.
+The current user's identity is used automatically via implicit credentials.
+
 ```
-Connect using current user identity via implicit credentials.
-No prompting. Just works if user has network/WinRM access to the target server.
+User: "Check server01"
+→ Connect using current user identity (no prompting, just works)
 ```
 
-### Explicit Credentials
-```
-If user says: "Check server01 with domain\admin credentials"
-  → Ask user for password (secure prompt)
-  → Create PSCredential object
-  → Pass to remoting cmdlets via -Credential parameter
+### Explicit Credentials (GUI Dialog)
+
+When the user says "use admin credentials" or "connect as domain\admin", run Get-Credential 
+to open a secure Windows login dialog:
+
+```powershell
+# Open secure credential dialog
+$cred = Get-Credential -UserName "domain\admin" -Message "Enter credentials for ServerName"
+
+# Use in remoting commands
+$SessionOption = New-PSSessionOption -SkipCACheck -SkipCNCheck
+$session = New-PSSession -ComputerName ServerName -UseSSL -Port 5986 -Credential $cred -SessionOption $SessionOption
 ```
 
-### Azure VM Credentials (Public IP)
+**Credential Flow (the correct pattern):**
 ```
-Azure VMs accessed over public IP ALWAYS require:
-  → Explicit credentials (Get-Credential) — Kerberos does not work over public internet
-  → HTTPS transport (-UseSSL on port 5986) — the universal connection method
-  → Username format: VM_NAME\AdminUser (local account) or user@domain.com (Azure AD)
-  → Session options: New-PSSessionOption -SkipCACheck -SkipCNCheck (handles certs and IP addresses)
-  → No TrustedHosts modification needed
+1. User says: "check server01 with admin credentials"
+2. Agent runs: $cred = Get-Credential -Message "Enter credentials for server01"
+3. Windows shows a secure login dialog (GUI popup)
+4. User enters username/password in the dialog window
+5. Agent uses $cred in -Credential parameter
+6. Password never appears in conversation
+```
 
-See the azure-connectivity skill for Azure-specific setup (NSG rules, WinRM listener, alternatives).
+### Azure VM Credentials (Always Required)
+
+Azure VMs over public IP **always need explicit credentials** — Kerberos does not work over the public internet:
+
+```powershell
+# Always prompt for creds when connecting to Azure VMs
+$cred = Get-Credential -Message "Enter Azure VM credentials for 20.30.40.50"
+
+$SessionOption = New-PSSessionOption -SkipCACheck -SkipCNCheck
+$session = New-PSSession -ComputerName "20.30.40.50" -UseSSL -Port 5986 -Credential $cred -SessionOption $SessionOption
 ```
+
+**Username formats for Azure VMs:**
+- Local account: `.\AdminUser` or `VMName\AdminUser`
+- Azure AD account: `user@domain.com`
+
+See the **azure-connectivity** skill for Azure-specific setup (NSG rules, WinRM listener, alternatives).
+
+### Pre-stored Credentials (Windows Credential Manager)
+
+For frequently accessed servers, users can store credentials once (they do this themselves, outside of Copilot):
+
+```powershell
+# User runs this one-time setup (not in Copilot chat):
+Install-Module -Name CredentialManager -Force
+New-StoredCredential -Target "server01" -UserName "domain\admin" -SecurePassword (Read-Host -AsSecureString "Password")
+
+# Agent retrieves stored credentials (no prompt needed):
+$cred = Get-StoredCredential -Target "server01"
+if ($cred) {
+    # Use $cred in remoting commands
+} else {
+    # Credential not found, fall back to Get-Credential
+    $cred = Get-Credential -Message "Enter credentials for server01"
+}
+```
+
+### ❌ NEVER Do These
+
+- **Never** ask "what is your password?" in the chat
+- **Never** construct: `ConvertTo-SecureString "PlainTextPassword" -AsPlainText -Force`
+- **Never** display or log credential objects (they contain passwords)
+- **Never** store passwords in variables as plain strings
+- **Never** accept a password typed directly in the conversation
 
 ### Error Handling
+
 ```
 ❌ Server unreachable
    → Check WinRM HTTPS listener is configured on the target
@@ -192,13 +258,18 @@ See the azure-connectivity skill for Azure-specific setup (NSG rules, WinRM list
    → Check hostname/IP is correct — IP addresses are supported directly
 
 ❌ Access denied
-   → Verify credentials are correct
+   → Verify credentials are correct (username/password in the Get-Credential dialog)
    → Check user has admin rights on target server
    → Check user is in Administrators group on target
 
 ❌ WinRM not responding
    → Target may be offline or WinRM service stopped
    → Ask user to verify server is online and responsive
+
+❌ Get-Credential dialog doesn't appear
+   → May need to focus the PowerShell window
+   → On some systems, the dialog appears behind other windows
+   → Check the taskbar for a blinking PowerShell or credential prompt window
 
 ❌ Azure VM — NSG blocking port 5986
    → Connection timeouts to Azure public IPs usually mean NSG has no inbound rule for TCP 5986

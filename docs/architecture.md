@@ -102,11 +102,26 @@ Each diagnostic area is an independent skill with:
 Credentials are **never stored**. They flow through the system as parameters:
 
 ```
-User provides credentials (or uses implicit current user)
-  → Agent passes to PowerShell skill
-    → Skill uses for Invoke-Command -Credential
-      → Credential is discarded after the session
+User specifies credentials are needed
+  → Agent runs Get-Credential (opens secure Windows login dialog)
+    → User enters username/password in GUI dialog (NOT in chat)
+      → Agent receives PSCredential object
+        → Agent passes to PowerShell skill via -Credential parameter
+          → Skill uses for Invoke-Command -Credential
+            → Credential is discarded after the session ends
 ```
+
+**Security principles:**
+- Passwords are NEVER typed in the Copilot CLI chat
+- Get-Credential opens a Windows GUI dialog for secure entry
+- Passwords are never visible in conversation history
+- PSCredential objects are never logged or displayed
+- Credentials are used only for the current operation, then discarded
+
+**Alternative: Pre-stored credentials**
+- Users can optionally pre-store credentials in Windows Credential Manager
+- Agent retrieves them with `Get-StoredCredential` (no prompting needed)
+- Useful for frequently accessed servers
 
 ---
 

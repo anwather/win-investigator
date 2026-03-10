@@ -94,10 +94,15 @@ Uses New-CimSession or Invoke-Command with implicit credentials.
 ### Explicit Credentials
 ```
 User provides: "Check server01 with domain\admin credentials"
-Agent prompts for password (secure input).
-Creates PSCredential object.
-Passes to remoting cmdlets via -Credential parameter.
+Agent runs: $cred = Get-Credential -Message "Enter credentials for server01"
+Windows opens a secure login dialog (GUI).
+User enters username/password in the dialog (NOT in chat).
+Agent uses $cred in -Credential parameter.
+Password never appears in conversation.
 ```
+
+⚠️ **SECURITY:** Never ask the user to type a password in the chat. Always use Get-Credential 
+which opens a secure Windows dialog.
 
 ### Connection Transport
 ```

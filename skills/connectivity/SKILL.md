@@ -5,9 +5,26 @@ Test connectivity to a Windows Server and establish a PowerShell remoting sessio
 
 ## Prerequisites
 - PowerShell remoting enabled on target server (WinRM HTTPS listener on port 5986)
-- Appropriate credentials (current user or explicit)
+- Appropriate credentials (current user by default, or explicit via Get-Credential for secure prompting)
 - Network connectivity to target server on port 5986 (HTTPS)
 - IP addresses are supported directly — no TrustedHosts modification required
+
+## Credential Handling
+
+⚠️ **SECURITY: NEVER ask users to type passwords in the chat.** Use `Get-Credential` which opens 
+a secure Windows login dialog where passwords are never visible in the conversation.
+
+**Default (current user):**
+```powershell
+$Credential = $null  # Uses current user's identity automatically
+```
+
+**Explicit credentials (secure dialog):**
+```powershell
+# Opens a Windows GUI dialog for secure password entry
+$Credential = Get-Credential -UserName "domain\admin" -Message "Enter credentials for ServerName"
+# User enters password in the dialog, NOT in the chat
+```
 
 ## Connection Pattern
 
@@ -55,7 +72,11 @@ try {
 ### Establish PSSession (Reusable Session)
 ```powershell
 $ServerName = "TARGET_SERVER"  # Hostname or IP address
-$Credential = $null  # Set to Get-Credential result if needed
+
+# For explicit credentials, open secure dialog (NEVER type passwords in chat):
+# $Credential = Get-Credential -UserName "domain\admin" -Message "Enter credentials for $ServerName"
+# For current user (default):
+$Credential = $null
 
 $SessionOption = New-PSSessionOption -SkipCACheck -SkipCNCheck
 $splat = @{
@@ -91,7 +112,7 @@ try {
     Write-Warning "✗ Connection failed: $($_.Exception.Message)"
 
     if ($_.Exception.Message -match "Access is denied") {
-        Write-Host "  → Check credentials and permissions" -ForegroundColor Yellow
+        Write-Host "  → Check credentials and permissions (use Get-Credential for explicit creds)" -ForegroundColor Yellow
     } elseif ($_.Exception.Message -match "cannot be resolved") {
         Write-Host "  → Check DNS resolution and network connectivity" -ForegroundColor Yellow
     } elseif ($_.Exception.Message -match "certificate") {
@@ -105,7 +126,11 @@ try {
 ### One-Shot Invoke-Command (No Persistent Session)
 ```powershell
 $ServerName = "TARGET_SERVER"
-$Credential = $null  # Set to Get-Credential result if needed
+
+# For explicit credentials, open secure dialog:
+# $Credential = Get-Credential -Message "Enter credentials for $ServerName"
+# For current user:
+$Credential = $null
 
 $SessionOption = New-PSSessionOption -SkipCACheck -SkipCNCheck
 $invokeParams = @{
@@ -176,21 +201,22 @@ try {
 
 | Error Message | Likely Cause | Resolution |
 |--------------|--------------|------------|
-| "Access is denied" | Insufficient permissions | Use account with local admin rights |
+| "Access is denied" | Insufficient permissions or wrong credentials | Use account with local admin rights; verify credentials in Get-Credential dialog |
 | "Cannot be resolved" | DNS/Name resolution | Check hostname, try IP address directly |
 | "WinRM cannot process the request" | WinRM HTTPS not configured | Configure WinRM HTTPS listener on target |
 | "Connection timed out" | Firewall/NSG blocking port 5986 | Check firewall and NSG inbound rules for TCP 5986 |
-| "Logon failure" | Bad credentials | Verify username/password |
+| "Logon failure" | Bad credentials | Verify username/password entered in Get-Credential dialog |
 | "Server certificate invalid" | Certificate issue | Handled by -SkipCACheck and -SkipCNCheck |
-| "Negotiate authentication error" | Kerberos over internet | Use explicit -Credential parameter |
+| "Negotiate authentication error" | Kerberos over internet | Use explicit -Credential parameter via Get-Credential |
 
 ## Security Considerations
 
 1. **Always HTTPS** — All connections use port 5986 with SSL/TLS encryption
-2. **SkipCACheck / SkipCNCheck** — Bypasses certificate validation for self-signed certs; acceptable for known servers you control
-3. **IP addresses supported** — Connect directly to IPs without TrustedHosts modification
-4. **Credentials** — Use `Get-Credential` for alternate accounts; never hardcode passwords
-5. **For production** — Consider CA-issued certificates and removing Skip flags
+2. **Never type passwords in chat** — Use `Get-Credential` which opens a secure Windows dialog for password entry
+3. **SkipCACheck / SkipCNCheck** — Bypasses certificate validation for self-signed certs; acceptable for known servers you control
+4. **IP addresses supported** — Connect directly to IPs without TrustedHosts modification
+5. **Credentials never stored** — PSCredential objects are used once and discarded
+6. **For production** — Consider CA-issued certificates and removing Skip flags
 
 ## WinRM HTTPS Setup on Target
 
